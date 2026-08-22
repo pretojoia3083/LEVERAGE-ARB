@@ -157,8 +157,18 @@ async function pollDashboard() {
     renderOpps(d.opportunities || []);
     fillSimSelects();
 
+    if (b && b.net_usdt > 0) {
+      const rb = $('robotBadge');
+      rb.style.display = 'block';
+      rb.innerHTML = `🤖 ${b.pair} ${b.buy_exchange}→${b.sell_exchange} +${b.net_pct}%`;
+    }
+
     if (d.total_simulations && d.total_simulations > totalSimOld) {
       playBeep(660, 0.15);
+      const rb = $('robotBadge');
+      rb.style.display = 'block';
+      rb.innerHTML = '🤖 Nova simulação gravada!';
+      setTimeout(() => { rb.style.display = 'none'; }, 4000);
     }
     totalSimOld = d.total_simulations || 0;
   } catch (e) { /* servidor ainda subindo */ }

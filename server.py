@@ -66,6 +66,9 @@ def home():
 def dashboard():
     snap = scanner.snapshot()
     snap['investment'] = config.INVESTMENT_USDT
+    stats = db.stats()
+    snap['total_simulations'] = stats.get('total_simulations', 0)
+    snap['total_executions'] = stats.get('total_executions', 0)
     return snap
 
 

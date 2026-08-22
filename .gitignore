@@ -1,7 +1,10 @@
 __pycache__/
 *.pyc
-leverage_arb.db
-leverage_arb.db-wal
-leverage_arb.db-shm
+*.db
+*.db-wal
+*.db-shm
 servidor.log
 .env
+deploy.bat
+deploy_nuvem.bat
+deploy_nuvem.py
