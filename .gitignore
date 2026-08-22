@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+leverage_arb.db
+leverage_arb.db-wal
+leverage_arb.db-shm
+servidor.log
+.env

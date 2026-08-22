@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEVERAGE ARB — Arbitragem Cripto</title>
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="layout">
+
+  <nav class="sidebar">
+    <div class="logo-row">
+      <svg viewBox="0 0 96 96" width="38" height="38" fill="none">
+        <defs>
+          <linearGradient id="lbg" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#1A1A1A"/><stop offset="1" stop-color="#000000"/>
+          </linearGradient>
+          <linearGradient id="lor" x1="0" y1="0" x2="0" y2="1">
+            <stop stop-color="#FFB347"/><stop offset="1" stop-color="#FF6B00"/>
+          </linearGradient>
+          <linearGradient id="lw" x1="0" y1="0" x2="0" y2="1">
+            <stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#E0E0E0"/>
+          </linearGradient>
+        </defs>
+        <rect width="96" height="96" rx="22" fill="url(#lbg)" stroke="#FF6B00" stroke-opacity="0.35"/>
+        <rect x="22" y="16" width="6" height="48" rx="3" fill="url(#lw)"/>
+        <rect x="18" y="32" width="14" height="26" rx="3" fill="url(#lw)"/>
+        <rect x="45" y="12" width="6" height="54" rx="3" fill="url(#lor)"/>
+        <rect x="41" y="24" width="14" height="32" rx="3" fill="url(#lor)"/>
+        <rect x="68" y="28" width="6" height="48" rx="3" fill="url(#lor)"/>
+        <rect x="64" y="42" width="14" height="30" rx="3" fill="url(#lor)"/>
+      </svg>
+      <span class="font-display logo-text">LEVERAGE <span class="grad">ARB</span></span>
+    </div>
+
+    <div class="menu">
+      <div class="menu-label">Menu</div>
+      <button class="menu-item active" data-tab="scanner"><span>⚡</span> Scanner</button>
+      <button class="menu-item" data-tab="simulador"><span>🧪</span> Simulador</button>
+      <button class="menu-item" data-tab="historico"><span>📜</span> Histórico</button>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="live-badge" id="connBadge">
+        <span class="dot gray"></span> Conectando...
+      </div>
+      <div class="foot-info">Scanner multi-exchange<br>11 corretoras · 10 ativos</div>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <!-- SCANNER -->
+    <section id="tab-scanner" class="tab active">
+      <div class="page-head">
+        <div>
+          <h1 class="font-display">⚡ Arbitragem Cripto</h1>
+          <p class="muted">Compre barato em uma corretora, venda caro em outra — com detecção automática da rede mais barata</p>
+        </div>
+      </div>
+
+      <div class="grid-4">
+        <div class="card p5">
+          <div class="card-label">💹 Oportunidades agora</div>
+          <div class="card-value font-display" id="stOpps">—</div>
+          <div class="card-sub muted" id="stScan">aguardando scanner...</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">💰 Melhor lucro líquido</div>
+          <div class="card-value font-display green" id="stBest">—</div>
+          <div class="card-sub muted" id="stBestSub">—</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">🧾 Simulações 24h</div>
+          <div class="card-value font-display" id="stSims">0</div>
+          <div class="card-sub muted">registradas automaticamente</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">📈 Lucro simulado 24h</div>
+          <div class="card-value font-display" id="stProfit">$0.00</div>
+          <div class="card-sub muted" id="stAvg">— média por operação</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>🏆 Melhor oportunidade agora</h2>
+          <span class="muted small">auto-atualiza a cada 5s · rede mais barata detectada automaticamente</span>
+        </div>
+        <div id="bestPanel" class="best-empty muted">Nenhuma oportunidade no momento. O scanner monitora 10 corretoras × 10 ativos continuamente...</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>💹 Todas as oportunidades ao vivo</h2>
+          <span class="muted small" id="oppCount"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Ativo</th><th>Comprar</th><th>Vender</th>
+                <th>Spread bruto</th><th>Melhor rede</th><th>Taxas totais</th>
+                <th>Tempo estimado</th><th class="right">Lucro líquido</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="oppsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SIMULADOR -->
+    <section id="tab-simulador" class="tab">
+      <div class="page-head">
+        <div>
+          <h1 class="font-display">🧪 Simulador</h1>
+          <p class="muted">Simule qualquer rota com preços reais do scanner — comparativo de todas as redes</p>
+        </div>
+      </div>
+
+      <div class="sim-grid">
+        <div class="card p5">
+          <label class="label">Ativo</label>
+          <select id="simPair" class="input"></select>
+
+          <label class="label mt16">Corretora de compra (ask)</label>
+          <select id="simBuy" class="input"></select>
+
+          <label class="label mt16">Corretora de venda (bid)</label>
+          <select id="simSell" class="input"></select>
+
+          <label class="label mt16">Valor investido (USDT)</label>
+          <input type="number" id="simInvest" class="input" value="1000" min="10" step="50">
+
+          <label class="label mt16">Rede de saque</label>
+          <select id="simNetwork" class="input">
+            <option value="AUTO">🤖 Auto — detecta a mais barata</option>
+            <option value="BEP20">BEP20 ($0.30 · ~3min)</option>
+            <option value="POLYGON">Polygon ($0.10 · ~3min)</option>
+            <option value="ARBITRUM">Arbitrum ($0.15 · ~3min)</option>
+            <option value="SOL">Solana ($0.05 · ~1min)</option>
+            <option value="TRC20">TRC20 ($1.00 · ~2min)</option>
+            <option value="ERC20">ERC20 ($4.00 · ~15min)</option>
+          </select>
+
+          <button class="btn-primary w100 mt20" id="simRun">🚀 Rodar simulação</button>
+        </div>
+
+        <div class="card p5">
+          <div class="card-head noborder"><h2>Resultado</h2></div>
+          <div id="simResult" class="muted">Escolha uma rota e clique em "Rodar simulação" — ou clique em 🧪 numa linha do Scanner.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORICO -->
+    <section id="tab-historico" class="tab">
+      <div class="page-head">
+        <div>
+          <h1 class="font-display">📜 Histórico</h1>
+          <p class="muted">Operações simuladas pelo sistema com oportunidades reais</p>
+        </div>
+        <button class="btn-danger" id="btnClear">Limpar histórico</button>
+      </div>
+
+      <div class="grid-3">
+        <div class="card p5">
+          <div class="card-label">Total simulado</div>
+          <div class="card-value font-display" id="hsCount">0</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">Lucro total simulado</div>
+          <div class="card-value font-display green" id="hsTotal">$0.00</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">Melhor rota 24h</div>
+          <div class="card-value font-display orange" id="hsBest">—</div>
+          <div class="card-sub muted" id="hsBestSub"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>📜 Histórico</h2>
+          <span class="muted small">Simulações automáticas + execuções do botão</span>
+        </div>
+        <div class="table-wrap maxh">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Hora</th><th>Tipo</th><th>Ativo</th><th>Rota</th>
+                <th>Rede</th><th>Spread</th><th>Investido</th>
+                <th>Tempo est.</th><th class="right">Lucro líq.</th>
+              </tr>
+            </thead>
+            <tbody id="histBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>⚡ Execuções realizadas</h2><span class="muted small">tempo real medido de cada operação</span></div>
+        <div class="table-wrap maxh">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Hora</th><th>Ativo</th><th>Rota</th><th>Rede</th>
+                <th>Modo</th><th>Investido</th>
+                <th>Tempo real</th><th class="right">Lucro líq.</th>
+              </tr>
+            </thead>
+            <tbody id="execBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div id="execToast" class="exec-toast"></div>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
