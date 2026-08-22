@@ -1,12 +1,18 @@
+import os
+
 INVESTMENT_USDT = 1000.0
 MIN_NET_PCT = 0.0
 AUTO_SIM_THRESHOLD = 0.10
-AUTO_SIM_DOLLAR_MIN = 1.0   # grava simulação só se lucro >= USD 1.00
+AUTO_SIM_DOLLAR_MIN = 1.0
 AUTO_SIM_COOLDOWN = 60
 SCAN_INTERVAL = 5
 TOP_LIMIT = 50
 
+IS_CLOUD = os.environ.get('RENDER') is not None
+
 EXCHANGES = [
+    'binance', 'bybit', 'bitget', 'okx', 'gate', 'mexc',
+] if IS_CLOUD else [
     'binance', 'bybit', 'bitget', 'kucoin',
     'okx', 'gate', 'mexc', 'htx', 'kraken',
     'mercadobitcoin',
