@@ -1,16 +1,13 @@
 import subprocess, os
 os.chdir(r"C:\Users\Renato\Desktop\projetos code ia\LEVERAGE ARB")
+def run(cmd):
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+    if r.stdout: print(r.stdout.strip())
+    if r.stderr: print(r.stderr.strip())
+    return r.returncode
 
-files = ['leverage_arb.db', 'servidor.log', 'deploy.bat', 'deploy_nuvem.bat', 'deploy_nuvem.py', 'fix_repo.py']
-for f in files:
-    r = subprocess.run(['git', 'rm', '--cached', '-f', f], capture_output=True, text=True)
-    msg = r.stdout.strip() or r.stderr.strip()
-    print(f'{f}: {msg}')
-
-subprocess.run(['git', 'add', '.'], capture_output=True)
-r = subprocess.run(['git', 'commit', '-m', 'fix: remove db log scripts from repo'], capture_output=True, text=True)
-print(r.stdout.strip() or r.stderr.strip())
-
-r = subprocess.run(['git', 'push', 'origin', 'master:main', '--force'], capture_output=True, text=True, timeout=25)
-print(r.stdout.strip() or r.stderr.strip())
+run(['git', 'rm', '--cached', '-f', 'fix_repo.py'])
+run(['git', 'add', '.'])
+run(['git', 'commit', '-m', 'fix: pin Python 3.12 for Render compatibility'])
+run(['git', 'push', 'origin', 'master:main', '--force'])
 print('DONE')
