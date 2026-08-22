@@ -1,30 +1,16 @@
 import subprocess, os
-
 os.chdir(r"C:\Users\Renato\Desktop\projetos code ia\LEVERAGE ARB")
 
-def run(cmd):
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.stdout: print(r.stdout.strip())
-    if r.stderr: print(r.stderr.strip())
-    return r.returncode
+files = ['leverage_arb.db', 'servidor.log', 'deploy.bat', 'deploy_nuvem.bat', 'deploy_nuvem.py', 'fix_repo.py']
+for f in files:
+    r = subprocess.run(['git', 'rm', '--cached', '-f', f], capture_output=True, text=True)
+    msg = r.stdout.strip() or r.stderr.strip()
+    print(f'{f}: {msg}')
 
-print("=== LIMPANDO GIT ===")
+subprocess.run(['git', 'add', '.'], capture_output=True)
+r = subprocess.run(['git', 'commit', '-m', 'fix: remove db log scripts from repo'], capture_output=True, text=True)
+print(r.stdout.strip() or r.stderr.strip())
 
-# Remover arquivos que nao devem estar no repo
-files_to_remove = ['leverage_arb.db', 'servidor.log', 'deploy.bat', 'deploy_nuvem.bat', 'deploy_nuvem.py', 'leverage_arb.db-wal', 'leverage_arb.db-shm']
-for f in files_to_remove:
-    run(['git', 'rm', '--cached', '-f', f])
-
-print("\n=== STATUS ===")
-run(['git', 'status'])
-
-print("\n=== ADD TUDO ===")
-run(['git', 'add', '.'])
-
-print("\n=== COMMIT ===")
-run(['git', 'commit', '-m', 'fix: add static folder, remove db/log from repo'])
-
-print("\n=== PUSH ===")
-run(['git', 'push', '-u', 'origin', 'main', '--force'])
-
-print("\n=== PRONTO ===")
+r = subprocess.run(['git', 'push', 'origin', 'master:main', '--force'], capture_output=True, text=True, timeout=25)
+print(r.stdout.strip() or r.stderr.strip())
+print('DONE')
