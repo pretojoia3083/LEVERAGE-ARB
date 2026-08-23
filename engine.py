@@ -225,22 +225,32 @@ class Scanner:
         pair = 'USDT/BRL'
         try:
             if eid == 'binance':
-                r = requests.get('https://api.binance.com/api/v3/ticker/price', params={'symbol': 'USDTBRL'}, timeout=10)
+                r = requests.get('https://api.binance.com/api/v3/ticker/price',
+                                 params={'symbol': 'USDTBRL'}, timeout=10,
+                                 headers={'User-Agent': 'Mozilla/5.0'})
                 d = r.json()
                 price = float(d.get('price', 0))
                 if price > 0:
                     return {pair: {'ask': price, 'bid': price}}
+                with self.lock:
+                    self.errors[eid] = f'binance api: {str(d)[:100]}'
             elif eid == 'bybit':
-                r = requests.get('https://api.bybit.com/v5/market/tickers', params={'category': 'spot', 'symbol': 'USDTBRL'}, timeout=10)
-                items = r.json().get('result', {}).get('list', [])
+                r = requests.get('https://api.bybit.com/v5/market/tickers',
+                                 params={'category': 'spot', 'symbol': 'USDTBRL'},
+                                 timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                d = r.json()
+                items = d.get('result', {}).get('list', [])
                 if items:
                     t = items[0]
                     ask = float(t.get('ask1Price', 0))
                     bid = float(t.get('bid1Price', 0))
                     if ask > 0 and bid > 0:
                         return {pair: {'ask': ask, 'bid': bid}}
-        except Exception:
-            pass
+                with self.lock:
+                    self.errors[eid] = f'bybit api: {str(d)[:100]}'
+        except Exception as e:
+            with self.lock:
+                self.errors[eid] = f'{eid} direct: {str(e)[:100]}'
         return None
 
     def snapshot(self):
