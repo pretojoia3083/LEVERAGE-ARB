@@ -86,7 +86,7 @@ class Scanner:
             try:
                 opts = {
                     'enableRateLimit': True,
-                    'timeout': 45000 if is_cloud else 20000,
+                    'timeout': 60000 if is_cloud else 20000,
                     'options': {'defaultType': 'spot'},
                 }
                 if eid in ('binance', 'htx'):
@@ -100,8 +100,7 @@ class Scanner:
                     opts['apiKey'] = config.BINANCE_API_KEY
                     opts['secret'] = config.BINANCE_SECRET_KEY
                 ex = getattr(ccxt, eid)(opts)
-                if not (is_cloud and eid == 'binance'):
-                    ex.load_markets()
+                ex.load_markets()
                 return eid, ex
             except Exception:
                 return eid, None
