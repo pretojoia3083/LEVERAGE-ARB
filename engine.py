@@ -220,6 +220,60 @@ class Scanner:
                 self.errors['mercadobitcoin'] = str(e)[:120]
         return None
 
+    def _fetch_direct(self, eid):
+        import requests
+        pair = 'USDT/BRL'
+        try:
+            if eid == 'binance':
+                r = requests.get('https://api.binance.com/api/v3/ticker/price', params={'symbol': 'USDTBRL'}, timeout=10)
+                d = r.json()
+                price = float(d.get('price', 0))
+                if price > 0:
+                    return {pair: {'ask': price, 'bid': price * 0.999}}
+            elif eid == 'bybit':
+                r = requests.get('https://api.bybit.com/v5/market/tickers', params={'category': 'spot', 'symbol': 'USDTBRL'}, timeout=10)
+                items = r.json().get('result', {}).get('list', [])
+                if items:
+                    t = items[0]
+                    ask = float(t.get('askPrice', 0))
+                    bid = float(t.get('bidPrice', 0))
+                    if ask > 0 and bid > 0:
+                        return {pair: {'ask': ask, 'bid': bid}}
+            elif eid == 'gate':
+                r = requests.get('https://api.gateio.ws/api/v4/spot/tickers', params={'currency_pair': 'USDT_BRL'}, timeout=10)
+                d = r.json()
+                if isinstance(d, list) and d:
+                    t = d[0]
+                    ask = float(t.get('lowest_ask', 0))
+                    bid = float(t.get('highest_bid', 0))
+                    if ask > 0 and bid > 0:
+                        return {pair: {'ask': ask, 'bid': bid}}
+            elif eid == 'mexc':
+                r = requests.get('https://api.mexc.com/api/v3/ticker/bookTicker', params={'symbol': 'USDTBRL'}, timeout=10)
+                d = r.json()
+                ask = float(d.get('askPrice', 0))
+                bid = float(d.get('bidPrice', 0))
+                if ask > 0 and bid > 0:
+                    return {pair: {'ask': ask, 'bid': bid}}
+            elif eid == 'kucoin':
+                r = requests.get('https://api.kucoin.com/api/v1/market/orderbook/level1', params={'symbol': 'USDT-BRL'}, timeout=10)
+                d = r.json().get('data', {})
+                ask = float(d.get('ask', 0))
+                bid = float(d.get('bid', 0))
+                if ask > 0 and bid > 0:
+                    return {pair: {'ask': ask, 'bid': bid}}
+            elif eid == 'kraken':
+                r = requests.get('https://api.kraken.com/0/public/Ticker', params={'pair': 'USDTBRL'}, timeout=10)
+                d = r.json().get('result', {})
+                for k, v in d.items():
+                    ask = float(v.get('a', [0])[0])
+                    bid = float(v.get('b', [0])[0])
+                    if ask > 0 and bid > 0:
+                        return {pair: {'ask': ask, 'bid': bid}}
+        except Exception:
+            pass
+        return None
+
     def snapshot(self):
         with self.lock:
             all_prices = {}
@@ -254,24 +308,17 @@ class Scanner:
 
         def _fetch(eid, ex):
             m = {}
-            try:
-                tickers = ex.fetch_tickers()
-                for pair in config.PAIRS:
-                    t = tickers.get(pair)
+            for pair in config.PAIRS:
+                try:
+                    t = ex.fetch_ticker(pair)
                     if t and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
                         m[pair] = {'ask': t['ask'], 'bid': t['bid']}
-                    else:
-                        raw = pair.replace('/', '')
-                        t2 = tickers.get(raw)
-                        if t2 and t2.get('ask') and t2.get('bid') and t2['ask'] > 0 and t2['bid'] > 0:
-                            m[pair] = {'ask': t2['ask'], 'bid': t2['bid']}
-                if not m:
-                    for sym, t in tickers.items():
-                        if 'USDT' in sym and 'BRL' in sym and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
-                            m['USDT/BRL'] = {'ask': t['ask'], 'bid': t['bid']}
-                            break
-            except Exception:
-                pass
+                except Exception:
+                    pass
+            if not m:
+                direct = self._fetch_direct(eid)
+                if direct:
+                    m = direct
             if not m:
                 return eid, None, f'{eid} USDT/BRL not available'
             return eid, m, None
