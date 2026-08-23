@@ -251,9 +251,7 @@ class Scanner:
 
         def _fetch(eid, ex):
             try:
-                wanted = [p for p in config.PAIRS if p in getattr(ex, 'markets', {}) or not getattr(ex, 'markets', None)]
-                if not wanted:
-                    return eid, None, None
+                wanted = list(config.PAIRS)
                 tickers = ex.fetch_tickers(wanted)
                 m = {}
                 for pair in wanted:
@@ -264,9 +262,7 @@ class Scanner:
             except Exception as e:
                 return eid, None, str(e)[:120]
 
-        items = [(eid, ex) for eid, ex in self.exchanges.items()
-                 if not getattr(ex, 'markets', None)
-                 or any(p in ex.markets for p in config.PAIRS)]
+        items = list(self.exchanges.items())
 
         fut_map = {}
         pool = ThreadPoolExecutor(max_workers=6)
