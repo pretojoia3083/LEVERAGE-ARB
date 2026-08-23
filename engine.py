@@ -247,22 +247,31 @@ class Scanner:
         self.ensure_exchanges()
         prices = {}
 
+        with self.lock:
+            self.errors.clear()
+
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         def _fetch(eid, ex):
             m = {}
-            for pair in config.PAIRS:
-                try:
-                    t = ex.fetch_ticker(pair)
+            try:
+                tickers = ex.fetch_tickers()
+                for pair in config.PAIRS:
+                    t = tickers.get(pair)
                     if t and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
                         m[pair] = {'ask': t['ask'], 'bid': t['bid']}
-                except Exception:
-                    try:
-                        t = ex.fetch_ticker(pair.replace('/', ''))
-                        if t and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
-                            m[pair] = {'ask': t['ask'], 'bid': t['bid']}
-                    except Exception:
-                        pass
+                    else:
+                        raw = pair.replace('/', '')
+                        t2 = tickers.get(raw)
+                        if t2 and t2.get('ask') and t2.get('bid') and t2['ask'] > 0 and t2['bid'] > 0:
+                            m[pair] = {'ask': t2['ask'], 'bid': t2['bid']}
+                if not m:
+                    for sym, t in tickers.items():
+                        if 'USDT' in sym and 'BRL' in sym and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
+                            m['USDT/BRL'] = {'ask': t['ask'], 'bid': t['bid']}
+                            break
+            except Exception:
+                pass
             if not m:
                 return eid, None, f'{eid} USDT/BRL not available'
             return eid, m, None
