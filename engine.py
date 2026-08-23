@@ -299,7 +299,10 @@ class Scanner:
                 if direct:
                     m = direct
             if not m:
-                return eid, None, f'{eid} USDT/BRL not available'
+                if eid not in self.errors:
+                    with self.lock:
+                        self.errors[eid] = f'{eid} USDT/BRL not available'
+                return eid, None, None
             return eid, m, None
 
         items = list(self.exchanges.items())
