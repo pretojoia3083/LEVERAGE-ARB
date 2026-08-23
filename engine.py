@@ -228,6 +228,8 @@ class Scanner:
                     all_prices[eid] = self.prices[eid]
                 else:
                     all_prices[eid] = {}
+            if 'mercadobitcoin' in self.prices:
+                all_prices['mercadobitcoin'] = self.prices['mercadobitcoin']
             return {
                 'connected': self.connected,
                 'last_scan': self.last_scan,
