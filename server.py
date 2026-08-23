@@ -89,6 +89,10 @@ def dashboard():
     stats = db.stats()
     snap['total_simulations'] = stats.get('total_simulations', 0)
     snap['total_executions'] = stats.get('total_executions', 0)
+    try:
+        snap['balances'] = scanner.fetch_balances()
+    except Exception:
+        snap['balances'] = {}
     return snap
 
 
@@ -103,6 +107,15 @@ def set_auto():
     AUTO_TRADE = not AUTO_TRADE
     print(f"[AUTO] {'LIGADO' if AUTO_TRADE else 'DESLIGADO'}")
     return {'auto_trade': AUTO_TRADE}
+
+
+@app.get("/api/balances")
+def get_balances():
+    try:
+        b = scanner.fetch_balances()
+        return b
+    except Exception as e:
+        return {'error': str(e)}
 
 
 @app.post("/api/simulate")

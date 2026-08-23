@@ -401,6 +401,35 @@ html, body {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
 
+/* BALANCES */
+.balances-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px; padding: 0 20px 20px;
+}
+.balance-card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; transition: all .3s;
+}
+.balance-card:hover { border-color: var(--orange); }
+.balance-card.error { border-color: rgba(239,68,68,.4); }
+.balance-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.balance-card-header .ex-name { font-weight: 700; font-size: 14px; text-transform: uppercase; }
+.balance-card-header .bal-status { font-size: 11px; font-weight: 600; }
+.balance-card-header .bal-status.ok { color: var(--green); }
+.balance-card-header .bal-status.err { color: var(--red); }
+.balance-coin {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-top: 1px solid rgba(26,35,51,.5);
+}
+.balance-coin:first-of-type { border-top: none; }
+.balance-coin-name { font-weight: 700; font-size: 13px; }
+.balance-coin-free { font-size: 12px; color: var(--green); }
+.balance-coin-used { font-size: 11px; color: var(--muted); }
+.balance-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 8px; }
+
 /* AUTO TOGGLE */
 .auto-toggle-wrap {
   display: flex; align-items: center; gap: 12px;

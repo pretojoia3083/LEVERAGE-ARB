@@ -98,6 +98,14 @@
         </div>
       </div>
 
+      <div class="card p5" id="balSummaryCard" style="display:none">
+        <div class="card-head noborder">
+          <h2>💰 Saldos nas Corretoras</h2>
+          <button class="btn-save" onclick="loadBalances()" style="font-size:12px;padding:6px 12px">🔄 Atualizar</button>
+        </div>
+        <div id="balSummary" class="balances-grid"></div>
+      </div>
+
       <div class="card p5">
         <div class="card-head noborder">
           <h2>📊 Preço USDT/BRL por Corretora</h2>
@@ -272,6 +280,15 @@
           <span class="muted small">Conexão atual de cada exchange</span>
         </div>
         <div id="settingsStatus" class="settings-status"></div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>💰 Saldos nas Corretoras</h2>
+          <span class="muted small" id="balanceHint">Configure API keys pra ver saldos</span>
+          <button class="btn-save" onclick="loadBalances()" style="margin-left:auto">🔄 Atualizar</button>
+        </div>
+        <div id="balancesGrid" class="balances-grid"></div>
       </div>
     </section>
 

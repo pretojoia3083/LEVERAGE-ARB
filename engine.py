@@ -84,6 +84,7 @@ class Scanner:
 
         def _load(eid):
             try:
+                import os
                 opts = {
                     'enableRateLimit': True,
                     'timeout': 60000 if is_cloud else 20000,
@@ -91,14 +92,21 @@ class Scanner:
                 }
                 if eid in ('binance', 'htx'):
                     opts['options']['fetchMarkets'] = ['spot']
-                if eid == 'bitget' and config.BITGET_API_KEY:
-                    opts['apiKey'] = config.BITGET_API_KEY
-                    opts['secret'] = config.BITGET_SECRET_KEY
-                    if config.BITGET_PASSPHRASE:
-                        opts['password'] = config.BITGET_PASSPHRASE
-                if eid == 'binance' and config.BINANCE_API_KEY:
-                    opts['apiKey'] = config.BINANCE_API_KEY
-                    opts['secret'] = config.BINANCE_SECRET_KEY
+
+                env_key = f'{eid.upper()}_API_KEY'
+                env_secret = f'{eid.upper()}_SECRET_KEY'
+                env_pass = f'{eid.upper()}_PASSPHRASE'
+                api_key = os.environ.get(env_key, '')
+                secret = os.environ.get(env_secret, '')
+                passphrase = os.environ.get(env_pass, '')
+
+                if api_key:
+                    opts['apiKey'] = api_key
+                if secret:
+                    opts['secret'] = secret
+                if passphrase:
+                    opts['password'] = passphrase
+
                 ex = getattr(ccxt, eid)(opts)
                 if is_cloud and eid in ('binance', 'bybit'):
                     try:
@@ -381,3 +389,26 @@ class Scanner:
             self._last_sim[key] = now
             picked.append(o)
         return picked
+
+    def fetch_balances(self):
+        balances = {}
+        for eid, ex in self.exchanges.items():
+            try:
+                if not ex.apiKey:
+                    balances[eid] = {'error': 'sem API key'}
+                    continue
+                b = ex.fetch_balance()
+                coins = {}
+                for coin in ['USDT', 'BRL', 'BTC', 'ETH', 'SOL', 'USDC']:
+                    free = float(b.get('free', {}).get(coin, 0) or 0)
+                    used = float(b.get('used', {}).get(coin, 0) or 0)
+                    total = free + used
+                    if total > 0:
+                        coins[coin] = {'free': round(free, 8), 'used': round(used, 8), 'total': round(total, 8)}
+                if coins:
+                    balances[eid] = {'ok': True, 'coins': coins}
+                else:
+                    balances[eid] = {'ok': True, 'coins': {}, 'note': 'conta vazia'}
+            except Exception as e:
+                balances[eid] = {'error': str(e)[:100]}
+        return balances

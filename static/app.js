@@ -80,7 +80,7 @@ document.querySelectorAll('.menu-item').forEach(btn => {
     btn.classList.add('active');
     $(`tab-${btn.dataset.tab}`).classList.add('active');
     if (btn.dataset.tab === 'historico') loadHistory();
-    if (btn.dataset.tab === 'configuracao') loadSettings();
+    if (btn.dataset.tab === 'configuracao') { loadSettings(); loadBalances(); }
   });
 });
 
@@ -195,6 +195,7 @@ async function pollDashboard() {
     renderOpps(d.opportunities || []);
     renderPrices(d.prices, d.opportunities || [], d.exchanges_ok || []);
     fillSimSelects();
+    renderBalSummary(d.balances || {});
 
     if (b && b.net_usdt > 0) {
       const rb = $('robotBadge');
@@ -528,4 +529,117 @@ window.clearSettings = async function(eid) {
   msg.textContent = '✓ Removida';
   msg.style.color = 'var(--green)';
   setTimeout(() => { msg.textContent = ''; }, 3000);
+};
+
+/* ---------- BALANCES ---------- */
+function renderBalSummary(balances) {
+  const card = $('balSummaryCard');
+  const grid = $('balSummary');
+  if (!card || !grid) return;
+
+  const hasKeys = Object.values(balances).some(b => !b.error);
+  if (!hasKeys) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+
+  let html = '';
+  for (const [eid, info] of Object.entries(balances)) {
+    const color = EX_COLORS[eid] || 'var(--text)';
+    const label = EX_LABELS[eid] || eid;
+    if (info.error) {
+      html += `
+        <div class="balance-card" style="opacity:.4">
+          <div class="balance-card-header">
+            <span class="ex-name" style="color:${color}">${label}</span>
+            <span class="bal-status err">sem key</span>
+          </div>
+        </div>`;
+    } else if (info.coins && Object.keys(info.coins).length > 0) {
+      html += `
+        <div class="balance-card">
+          <div class="balance-card-header">
+            <span class="ex-name" style="color:${color}">${label}</span>
+            <span class="bal-status ok">✓</span>
+          </div>
+          ${Object.entries(info.coins).map(([coin, bal]) => `
+            <div class="balance-coin">
+              <span class="balance-coin-name">${coin}</span>
+              <span class="balance-coin-free">${bal.free}</span>
+            </div>
+          `).join('')}
+        </div>`;
+    } else {
+      html += `
+        <div class="balance-card">
+          <div class="balance-card-header">
+            <span class="ex-name" style="color:${color}">${label}</span>
+            <span class="bal-status ok">✓</span>
+          </div>
+          <div class="balance-empty">sem saldo</div>
+        </div>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+
+window.loadBalances = async function() {
+  const grid = $('balancesGrid');
+  grid.innerHTML = '<div class="balance-empty">Carregando saldos...</div>';
+  const hint = $('balanceHint');
+  if (hint) hint.textContent = 'Buscando saldos...';
+
+  const data = await api('/api/balances');
+  if (data.error) {
+    grid.innerHTML = `<div class="balance-empty red">${data.error}</div>`;
+    return;
+  }
+
+  let html = '';
+  let hasAny = false;
+  for (const [eid, info] of Object.entries(data)) {
+    const color = EX_COLORS[eid] || 'var(--text)';
+    const label = EX_LABELS[eid] || eid;
+    if (info.error) {
+      html += `
+        <div class="balance-card error">
+          <div class="balance-card-header">
+            <span class="ex-name" style="color:${color}">${label}</span>
+            <span class="bal-status err">✗ ${info.error}</span>
+          </div>
+          <div class="balance-empty">Configure API key pra ver saldo</div>
+        </div>`;
+    } else if (info.coins && Object.keys(info.coins).length > 0) {
+      hasAny = true;
+      html += `
+        <div class="balance-card">
+          <div class="balance-card-header">
+            <span class="ex-name" style="color:${color}">${label}</span>
+            <span class="bal-status ok">✓ online</span>
+          </div>
+          ${Object.entries(info.coins).map(([coin, bal]) => `
+            <div class="balance-coin">
+              <div>
+                <span class="balance-coin-name">${coin}</span>
+                <span class="balance-coin-used"> · frozen: ${bal.used}</span>
+              </div>
+              <span class="balance-coin-free">${bal.free}</span>
+            </div>
+          `).join('')}
+        </div>`;
+    } else {
+      html += `
+        <div class="balance-card">
+          <div class="balance-card-header">
+            <span class="ex-name" style="color:${color}">${label}</span>
+            <span class="bal-status ok">✓ online</span>
+          </div>
+          <div class="balance-empty">${info.note || 'conta vazia ou sem dados'}</div>
+        </div>`;
+    }
+  }
+
+  if (hint) hint.textContent = hasAny ? 'Saldos atualizados' : 'Configure API keys pra ver saldos';
+  grid.innerHTML = html || '<div class="balance-empty">Nenhuma corretora configurada</div>';
 };
