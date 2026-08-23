@@ -100,7 +100,15 @@ class Scanner:
                     opts['apiKey'] = config.BINANCE_API_KEY
                     opts['secret'] = config.BINANCE_SECRET_KEY
                 ex = getattr(ccxt, eid)(opts)
-                ex.load_markets()
+                if is_cloud and eid in ('binance', 'bybit'):
+                    try:
+                        ex.load_markets()
+                    except Exception:
+                        pair = 'USDT/BRL'
+                        ex.markets = {pair: {'id': 'USDTBRL', 'symbol': pair, 'base': 'USDT', 'quote': 'BRL', 'active': True, 'type': 'spot'}}
+                        ex.markets_by_id = {'USDTBRL': ex.markets[pair]}
+                else:
+                    ex.load_markets()
                 return eid, ex
             except Exception:
                 return eid, None
