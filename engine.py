@@ -80,13 +80,13 @@ class Scanner:
 
         targets = [e for e in config.EXCHANGES if e != 'mercadobitcoin']
         is_cloud = config.IS_CLOUD
-        deadline = time.time() + (200 if is_cloud else 150)
+        deadline = time.time() + (240 if is_cloud else 150)
 
         def _load(eid):
             try:
                 opts = {
                     'enableRateLimit': True,
-                    'timeout': 40000 if is_cloud else 20000,
+                    'timeout': 45000 if is_cloud else 20000,
                     'options': {'defaultType': 'spot'},
                 }
                 if eid in ('binance', 'htx'):
@@ -106,26 +106,40 @@ class Scanner:
                 return eid, None
 
         loaded = {}
-        pool = ThreadPoolExecutor(max_workers=2 if is_cloud else 3)
-        fut_to_eid = {pool.submit(_load, eid): eid for eid in targets}
         remaining = []
-        try:
-            for fut in as_completed(fut_to_eid):
-                eid = fut_to_eid[fut]
-                try:
-                    _, ex = fut.result()
-                except Exception:
-                    ex = None
+
+        if is_cloud:
+            for eid in targets:
+                if time.time() > deadline:
+                    remaining.append(eid)
+                    continue
+                eid_ok, ex = _load(eid)
                 if ex is not None:
-                    loaded[eid] = ex
+                    loaded[eid_ok] = ex
+                    print(f"[LEVERAGE ARB] {eid_ok} conectado")
                 else:
                     remaining.append(eid)
-        except TimeoutError:
-            for fut, eid in fut_to_eid.items():
-                if not fut.done():
-                    remaining.append(eid)
-        finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+                    print(f"[LEVERAGE ARB] {eid} falhou")
+        else:
+            pool = ThreadPoolExecutor(max_workers=3)
+            fut_to_eid = {pool.submit(_load, eid): eid for eid in targets}
+            try:
+                for fut in as_completed(fut_to_eid):
+                    eid = fut_to_eid[fut]
+                    try:
+                        _, ex = fut.result()
+                    except Exception:
+                        ex = None
+                    if ex is not None:
+                        loaded[eid] = ex
+                    else:
+                        remaining.append(eid)
+            except TimeoutError:
+                for fut, eid in fut_to_eid.items():
+                    if not fut.done():
+                        remaining.append(eid)
+            finally:
+                pool.shutdown(wait=False, cancel_futures=True)
 
         self.exchanges.update(loaded)
         for eid in loaded:
