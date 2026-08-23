@@ -5,6 +5,31 @@ const EX_COLORS = {
   kraken: '#B08CFF', mercadobitcoin: '#25B9A5', bitso: '#37E2B2',
 };
 
+let AUTO_ON = false;
+
+window.toggleAuto = async function() {
+  const res = await api('/api/auto', { method: 'POST' });
+  AUTO_ON = res.auto_trade;
+  updateAutoUI();
+};
+
+function updateAutoUI() {
+  const check = $('autoCheck');
+  const label = $('autoLabel');
+  const status = $('autoStatus');
+  if (check) check.checked = AUTO_ON;
+  if (label) label.textContent = AUTO_ON ? 'Modo: Automático' : 'Modo: Manual';
+  if (status) {
+    status.textContent = AUTO_ON ? '🤖 Auto ON' : '✋ Manual';
+    status.className = 'auto-status ' + (AUTO_ON ? 'on' : 'off');
+  }
+  const rb = $('robotBadge');
+  if (AUTO_ON) {
+    rb.style.display = 'block';
+    rb.innerHTML = '🤖 Auto-TRADE LIGADO';
+  }
+}
+
 function playBeep(frequency = 440, duration = 0.2) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -55,6 +80,7 @@ document.querySelectorAll('.menu-item').forEach(btn => {
     btn.classList.add('active');
     $(`tab-${btn.dataset.tab}`).classList.add('active');
     if (btn.dataset.tab === 'historico') loadHistory();
+    if (btn.dataset.tab === 'configuracao') loadSettings();
   });
 });
 
@@ -143,11 +169,13 @@ function renderPrices(prices, opps, exchangesOk) {
 async function pollDashboard() {
   try {
     const d = await api('/api/dashboard');
-    // Inicializa contador antigo na primeira carga
     if (DASH && DASH.total_simulations_old === undefined) {
       DASH.total_simulations_old = d.total_simulations;
     }
     DASH = d;
+
+    AUTO_ON = d.auto_trade;
+    updateAutoUI();
 
     const badge = $('connBadge');
     if (d.connected) badge.innerHTML = '<span class="dot on"></span> Scanner ao vivo';
@@ -172,6 +200,14 @@ async function pollDashboard() {
       const rb = $('robotBadge');
       rb.style.display = 'block';
       rb.innerHTML = `🤖 ${b.pair} ${b.buy_exchange}→${b.sell_exchange} +${b.net_pct}%`;
+    } else if (!AUTO_ON) {
+      $('robotBadge').style.display = 'none';
+    }
+
+    if (AUTO_ON) {
+      const rb = $('robotBadge');
+      rb.style.display = 'block';
+      rb.innerHTML = '🤖 Auto-TRADE LIGADO';
     }
 
     if (d.total_simulations && d.total_simulations > totalSimOld) {
@@ -367,3 +403,129 @@ setInterval(pollDashboard, 5000);
 setInterval(() => {
   if ($('tab-historico').classList.contains('active')) loadHistory();
 }, 8000);
+
+/* ---------- CONFIGURACAO ---------- */
+const EX_LABELS = {
+  binance: 'Binance', bybit: 'Bybit', bitget: 'Bitget', okx: 'OKX',
+  gate: 'Gate.io', mexc: 'MEXC', kucoin: 'KuCoin', mercadobitcoin: 'MercadoBitcoin',
+};
+const EX_FIELDS = {
+  binance: ['API_KEY', 'SECRET_KEY'],
+  bybit: ['API_KEY', 'SECRET_KEY'],
+  bitget: ['API_KEY', 'SECRET_KEY', 'PASSPHRASE'],
+  okx: ['API_KEY', 'SECRET_KEY', 'PASSPHRASE'],
+  gate: ['API_KEY', 'SECRET_KEY'],
+  mexc: ['API_KEY', 'SECRET_KEY'],
+  kucoin: ['API_KEY', 'SECRET_KEY', 'PASSPHRASE'],
+  mercadobitcoin: ['API_KEY', 'SECRET_KEY'],
+};
+
+function maskKey(val) {
+  if (!val) return '';
+  if (val.length <= 8) return val;
+  return val.slice(0, 4) + '••••••••' + val.slice(-4);
+}
+
+async function loadSettings() {
+  const [settings, dash] = await Promise.all([api('/api/settings'), api('/api/dashboard')]);
+  const list = $('settingsList');
+  const status = $('settingsStatus');
+
+  let html = '';
+  for (const [eid, info] of Object.entries(settings)) {
+    const color = EX_COLORS[eid] || 'var(--text)';
+    const label = EX_LABELS[eid] || eid;
+    const configured = info.configured;
+    const isOpen = eid === 'binance';
+    html += `
+      <div class="settings-card${configured ? ' has-keys' : ''}${isOpen ? ' open' : ''}" id="scard-${eid}">
+        <div class="settings-card-header" onclick="toggleSettingsCard('${eid}')">
+          <div class="settings-card-left">
+            <span class="settings-status-dot ${configured ? 'on' : 'off'}"></span>
+            <span class="ex-name" style="color:${color}">${label}</span>
+            <span class="muted small">${configured ? '✓ Configurada' : 'Não configurada'}</span>
+          </div>
+          <span class="settings-card-toggle">▼</span>
+        </div>
+        <div class="settings-card-body">
+          <div class="settings-fields">
+            ${EX_FIELDS[eid].map(f => `
+              <div class="settings-field">
+                <label>${f}</label>
+                <input type="password" id="field-${eid}-${f}"
+                  placeholder="${f === 'PASSPHRASE' ? 'Passphrase (se aplicável)' : f}"
+                  value="${info.fields[f] || ''}"
+                  autocomplete="off" spellcheck="false">
+              </div>
+            `).join('')}
+          </div>
+          <div class="settings-actions">
+            <button class="btn-save" onclick="saveSettings('${eid}')">💾 Salvar</button>
+            ${configured ? `<button class="btn-clear-keys" onclick="clearSettings('${eid}')">🗑 Remover</button>` : ''}
+            <span class="settings-saved-msg" id="saved-${eid}"></span>
+          </div>
+        </div>
+      </div>`;
+  }
+  list.innerHTML = html;
+
+  let shtml = '';
+  for (const [eid, data] of Object.entries(dash.prices || {})) {
+    const color = EX_COLORS[eid] || 'var(--text)';
+    const label = EX_LABELS[eid] || eid;
+    const connected = (dash.exchanges_ok || []).includes(eid);
+    const hasData = data && data['USDT/BRL'] && data['USDT/BRL'].ask;
+    const error = (dash.errors || {})[eid];
+    shtml += `
+      <div class="status-item">
+        <span class="ex-dot" style="background:${hasData ? 'var(--green)' : connected ? 'var(--orange)' : '#64748B'}"></span>
+        <span style="color:${color};font-weight:600;font-size:13px">${label}</span>
+        <span class="muted small" style="margin-left:auto">${hasData ? '✓ online' : error ? '✗ erro' : 'offline'}</span>
+      </div>`;
+  }
+  status.innerHTML = shtml;
+}
+
+window.toggleSettingsCard = function(eid) {
+  const card = $(`scard-${eid}`);
+  card.classList.toggle('open');
+};
+
+window.saveSettings = async function(eid) {
+  const fields = {};
+  for (const f of EX_FIELDS[eid]) {
+    fields[f] = $(`field-${eid}-${f}`).value.trim();
+  }
+  const res = await api('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ exchange: eid, fields }),
+  });
+  const msg = $(`saved-${eid}`);
+  if (res.ok) {
+    msg.textContent = '✓ Salvo! Reinicie o servidor pra conectar.';
+    msg.style.color = 'var(--green)';
+    $(`scard-${eid}`).classList.add('has-keys');
+    const dot = $(`scard-${eid}`).querySelector('.settings-status-dot');
+    if (dot) { dot.className = 'settings-status-dot on'; }
+  } else {
+    msg.textContent = '✗ ' + (res.error || 'Erro ao salvar');
+    msg.style.color = 'var(--red)';
+  }
+  setTimeout(() => { msg.textContent = ''; }, 4000);
+};
+
+window.clearSettings = async function(eid) {
+  if (!confirm(`Remover as API keys da ${EX_LABELS[eid]}?`)) return;
+  await api(`/api/settings?exchange=${eid}`, { method: 'DELETE' });
+  for (const f of EX_FIELDS[eid]) {
+    $(`field-${eid}-${f}`).value = '';
+  }
+  $(`scard-${eid}`).classList.remove('has-keys');
+  const dot = $(`scard-${eid}`).querySelector('.settings-status-dot');
+  if (dot) { dot.className = 'settings-status-dot off'; }
+  const msg = $(`saved-${eid}`);
+  msg.textContent = '✓ Removida';
+  msg.style.color = 'var(--green)';
+  setTimeout(() => { msg.textContent = ''; }, 3000);
+};

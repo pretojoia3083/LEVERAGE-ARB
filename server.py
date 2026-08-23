@@ -1,6 +1,8 @@
+import os
 import threading
 import time
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,19 +13,26 @@ import db
 from engine import Scanner, simulate
 from executor import executor
 
+load_dotenv()
+
 app = FastAPI(title="LEVERAGE ARB")
 
 scanner = Scanner()
+
+AUTO_TRADE = False
+LAST_OPPS = []
 
 
 @app.on_event("startup")
 def startup():
     def bootstrap():
+        global LAST_OPPS
         n = scanner.load_exchanges()
         print(f"[LEVERAGE ARB] {n} corretoras conectadas")
         while True:
             try:
                 opps = scanner.scan()
+                LAST_OPPS = opps
                 for o in scanner.pick_auto_sims(opps):
                     db.add_simulation({
                         'trigger': 'auto',
@@ -41,6 +50,16 @@ def startup():
                     })
                     print(f"[SIM] {o['pair']} {o['buy_exchange']}->{o['sell_exchange']} "
                           f"+{o['net_pct']}% via {o['network']}")
+
+                if AUTO_TRADE and opps:
+                    best = opps[0]
+                    if best['net_usdt'] > 0:
+                        print(f"[AUTO] Executando {best['pair']} {best['buy_exchange']}->{best['sell_exchange']} +{best['net_pct']}%")
+                        executor.execute(
+                            scanner, best['pair'],
+                            best['buy_exchange'], best['sell_exchange'],
+                            best['invest_usdt'], best['network'],
+                        )
             except Exception as e:
                 print(f"[ERRO] scan: {e}")
             time.sleep(config.SCAN_INTERVAL)
@@ -66,10 +85,24 @@ def home():
 def dashboard():
     snap = scanner.snapshot()
     snap['investment'] = config.INVESTMENT_USDT
+    snap['auto_trade'] = AUTO_TRADE
     stats = db.stats()
     snap['total_simulations'] = stats.get('total_simulations', 0)
     snap['total_executions'] = stats.get('total_executions', 0)
     return snap
+
+
+@app.get("/api/auto")
+def get_auto():
+    return {'auto_trade': AUTO_TRADE}
+
+
+@app.post("/api/auto")
+def set_auto():
+    global AUTO_TRADE
+    AUTO_TRADE = not AUTO_TRADE
+    print(f"[AUTO] {'LIGADO' if AUTO_TRADE else 'DESLIGADO'}")
+    return {'auto_trade': AUTO_TRADE}
 
 
 @app.post("/api/simulate")
@@ -138,6 +171,103 @@ def do_execute(req: ExecRequest):
 @app.get("/api/executions")
 def executions(limit: int = 100):
     return {'data': db.recent_executions(limit)}
+
+
+EXCHANGE_FIELDS = {
+    'binance':  {'label': 'Binance',  'fields': ['API_KEY', 'SECRET_KEY']},
+    'bitget':   {'label': 'Bitget',   'fields': ['API_KEY', 'SECRET_KEY', 'PASSPHRASE']},
+    'okx':      {'label': 'OKX',      'fields': ['API_KEY', 'SECRET_KEY', 'PASSPHRASE']},
+    'bybit':    {'label': 'Bybit',    'fields': ['API_KEY', 'SECRET_KEY']},
+    'mexc':     {'label': 'MEXC',     'fields': ['API_KEY', 'SECRET_KEY']},
+    'kucoin':   {'label': 'KuCoin',   'fields': ['API_KEY', 'SECRET_KEY', 'PASSPHRASE']},
+    'gate':     {'label': 'Gate.io',  'fields': ['API_KEY', 'SECRET_KEY']},
+    'mercadobitcoin': {'label': 'MercadoBitcoin', 'fields': ['API_KEY', 'SECRET_KEY']},
+}
+
+
+def _env_key(eid, field):
+    return f'{eid.upper()}_{field}'
+
+
+@app.get("/api/settings")
+def get_settings():
+    result = {}
+    for eid, info in EXCHANGE_FIELDS.items():
+        result[eid] = {'label': info['label'], 'configured': False, 'fields': {}}
+        for f in info['fields']:
+            val = os.environ.get(_env_key(eid, f), '')
+            result[eid]['fields'][f] = val
+            if val:
+                result[eid]['configured'] = True
+    return result
+
+
+class SettingsRequest(BaseModel):
+    exchange: str
+    fields: dict
+
+
+@app.post("/api/settings")
+def save_settings(req: SettingsRequest):
+    eid = req.exchange
+    if eid not in EXCHANGE_FIELDS:
+        return {'error': f'Corretora {eid} desconhecida'}
+
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    lines = []
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+    for field, value in req.fields.items():
+        key = _env_key(eid, field)
+        env_line = f'{key}={value}\n'
+        found = False
+        for i, line in enumerate(lines):
+            if line.strip().startswith(f'{key}='):
+                lines[i] = env_line
+                found = True
+                break
+        if not found:
+            lines.append(env_line)
+        os.environ[key] = value
+
+    with open(env_path, 'w', encoding='utf-8') as f:
+        f.writelines(lines)
+
+    return {'ok': True, 'exchange': eid, 'message': f'{EXCHANGE_FIELDS[eid]["label"]} salva! Reinicie para conectar.'}
+
+
+@app.delete("/api/settings")
+def clear_settings(exchange: str):
+    eid = exchange
+    if eid not in EXCHANGE_FIELDS:
+        return {'error': 'Corretora desconhecida'}
+
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    lines = []
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+    new_lines = []
+    for line in lines:
+        keep = True
+        for f in EXCHANGE_FIELDS[eid]['fields']:
+            if line.strip().startswith(f'{eid.upper()}_{f}='):
+                keep = False
+                break
+        if keep:
+            new_lines.append(line)
+
+    with open(env_path, 'w', encoding='utf-8') as f:
+        f.writelines(new_lines)
+
+    for f in EXCHANGE_FIELDS[eid]['fields']:
+        key = _env_key(eid, f)
+        os.environ.pop(key, None)
+
+    return {'ok': True}
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

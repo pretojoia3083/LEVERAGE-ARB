@@ -42,6 +42,7 @@
       <button class="menu-item active" data-tab="scanner"><span>⚡</span> Scanner</button>
       <button class="menu-item" data-tab="simulador"><span>🧪</span> Simulador</button>
       <button class="menu-item" data-tab="historico"><span>📜</span> Histórico</button>
+      <button class="menu-item" data-tab="configuracao"><span>⚙️</span> Configuração</button>
     </div>
 
     <div class="sidebar-foot">
@@ -51,7 +52,7 @@
       <div class="live-badge" id="robotBadge" style="display:none;background:#FF6B00;color:#000;margin-top:6px">
         🤖 Operando...
       </div>
-      <div class="foot-info">Scanner multi-exchange<br>8 corretoras · USDT/BRL</div>
+      <div class="foot-info">Scanner multi-exchange<br>6 corretoras · USDT/BRL</div>
     </div>
   </nav>
 
@@ -63,6 +64,14 @@
         <div>
           <h1 class="font-display">⚡ Arbitragem Cripto</h1>
           <p class="muted">Compre barato em uma corretora, venda caro em outra — com detecção automática da rede mais barata</p>
+        </div>
+        <div class="auto-toggle-wrap">
+          <span class="muted small" id="autoLabel">Modo: Manual</span>
+          <label class="auto-toggle" id="autoToggle" onclick="toggleAuto()">
+            <input type="checkbox" id="autoCheck">
+            <span class="auto-slider"></span>
+          </label>
+          <span class="auto-status" id="autoStatus">✋ Manual</span>
         </div>
       </div>
 
@@ -228,6 +237,41 @@
             <tbody id="execBody"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- CONFIGURACAO -->
+    <section id="tab-configuracao" class="tab">
+      <div class="page-head">
+        <div>
+          <h1 class="font-display">⚙️ Configuração</h1>
+          <p class="muted">Adicione suas API keys das corretoras para operar em modo real</p>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>🔑 API Keys das Corretoras</h2>
+          <span class="muted small">Preencha as chaves da corretora que você usa</span>
+        </div>
+
+        <div class="settings-warn">
+          <span>⚠️</span>
+          <div>
+            <b>Segurança:</b> As API keys ficam salvas apenas no seu computador (arquivo .env).
+            <strong>NUNCA</strong> compartilhe suas chaves. Habilite apenas leitura + trade, <strong>NUNCA saque</strong>.
+          </div>
+        </div>
+
+        <div id="settingsList" class="settings-list"></div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>📋 Status das Corretoras</h2>
+          <span class="muted small">Conexão atual de cada exchange</span>
+        </div>
+        <div id="settingsStatus" class="settings-status"></div>
       </div>
     </section>
 
