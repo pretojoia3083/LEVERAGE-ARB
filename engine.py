@@ -242,6 +242,16 @@ class Scanner:
                         return {pair: {'ask': ask, 'bid': bid}}
                 with self.lock:
                     self.errors[eid] = f'bybit api: {str(d)[:100]}'
+            elif eid == 'mexc':
+                d = ex.publicGetTicker24hr({'symbol': 'BRLUSDT'})
+                brl_ask = float(d.get('askPrice', 0))
+                brl_bid = float(d.get('bidPrice', 0))
+                if brl_ask > 0 and brl_bid > 0:
+                    usdt_ask = 1.0 / brl_bid
+                    usdt_bid = 1.0 / brl_ask
+                    return {pair: {'ask': round(usdt_ask, 4), 'bid': round(usdt_bid, 4)}}
+                with self.lock:
+                    self.errors[eid] = f'mexc api: {str(d)[:100]}'
             else:
                 return None
         except Exception as e:
