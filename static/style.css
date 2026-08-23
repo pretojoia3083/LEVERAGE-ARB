@@ -431,10 +431,22 @@ html, body {
 .balance-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 8px; }
 
 /* AUTO TOGGLE */
+.controls-wrap {
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
 .auto-toggle-wrap {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 16px; border-radius: 12px;
   background: var(--card); border: 1px solid var(--border);
+}
+.mode-toggle-wrap {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--border);
+}
+.mode-toggle-wrap.real {
+  border-color: rgba(239,68,68,.5);
+  background: rgba(239,68,68,.08);
 }
 .auto-toggle {
   position: relative; width: 48px; height: 26px; cursor: pointer;
@@ -456,3 +468,48 @@ html, body {
 }
 .auto-status.on { color: var(--green); }
 .auto-status.off { color: var(--muted); }
+.mode-status {
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.mode-status.on { color: var(--red); }
+.mode-status.off { color: var(--muted); }
+
+/* PENDING TRANSFER */
+.pending-card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; margin-top: 8px;
+}
+.pending-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; font-size: 13px;
+}
+.pending-row span { color: var(--muted); }
+.pending-row b { color: var(--text); }
+.pending-addr {
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; margin: 10px 0; font-family: monospace; font-size: 13px;
+  word-break: break-all; color: var(--orange); font-weight: 600;
+}
+.pending-step {
+  display: flex; align-items: center; gap: 10px; padding: 10px 0;
+  font-size: 13px;
+}
+.pending-step-num {
+  width: 28px; height: 28px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-weight: 700;
+  font-size: 13px; flex-shrink: 0;
+}
+.pending-step-num.done { background: rgba(16,185,129,.15); color: var(--green); }
+.pending-step-num.active { background: rgba(255,107,0,.15); color: var(--orange); }
+.pending-step-num.wait { background: rgba(100,116,139,.15); color: #64748B; }
+.pending-instructions {
+  background: rgba(255,107,0,.06); border: 1px solid rgba(255,107,0,.25);
+  border-radius: 10px; padding: 14px; margin-top: 10px; font-size: 13px;
+  color: var(--muted); line-height: 1.7;
+}
+.pending-instructions b { color: var(--orange); }
+.btn-copy {
+  background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.3);
+  color: var(--green); border-radius: 6px; padding: 4px 10px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+}

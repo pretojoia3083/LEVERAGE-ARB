@@ -65,13 +65,23 @@
           <h1 class="font-display">⚡ Arbitragem Cripto</h1>
           <p class="muted">Compre barato em uma corretora, venda caro em outra — com detecção automática da rede mais barata</p>
         </div>
-        <div class="auto-toggle-wrap">
-          <span class="muted small" id="autoLabel">Modo: Manual</span>
-          <label class="auto-toggle" id="autoToggle" onclick="toggleAuto()">
-            <input type="checkbox" id="autoCheck">
-            <span class="auto-slider"></span>
-          </label>
-          <span class="auto-status" id="autoStatus">✋ Manual</span>
+        <div class="controls-wrap">
+          <div class="mode-toggle-wrap">
+            <span class="muted small" id="modeLabel">Modo: Paper</span>
+            <label class="auto-toggle" id="modeToggle" onclick="toggleMode()">
+              <input type="checkbox" id="modeCheck">
+              <span class="auto-slider"></span>
+            </label>
+            <span class="mode-status" id="modeStatus">📝 Paper</span>
+          </div>
+          <div class="auto-toggle-wrap">
+            <span class="muted small" id="autoLabel">Auto: OFF</span>
+            <label class="auto-toggle" id="autoToggle" onclick="toggleAuto()">
+              <input type="checkbox" id="autoCheck">
+              <span class="auto-slider"></span>
+            </label>
+            <span class="auto-status" id="autoStatus">✋ Manual</span>
+          </div>
         </div>
       </div>
 
@@ -292,7 +302,15 @@
       </div>
     </section>
 
-    <div id="execToast" class="exec-toast"></div>
+      <div id="pendingSection" class="card" style="display:none;border-color:rgba(255,107,0,.5)">
+        <div class="card-head">
+          <h2>⏳ Transferência Pendente</h2>
+          <span class="badge badge-orange">Aguardando</span>
+        </div>
+        <div id="pendingBody" class="p5"></div>
+      </div>
+
+      <div id="execToast" class="exec-toast"></div>
 
   </main>
 </div>

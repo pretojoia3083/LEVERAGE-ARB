@@ -12,7 +12,7 @@ BITGET_PASSPHRASE = os.environ.get('BITGET_PASSPHRASE', '')
 BINANCE_API_KEY = os.environ.get('BINANCE_API_KEY', '')
 BINANCE_SECRET_KEY = os.environ.get('BINANCE_SECRET_KEY', '')
 
-INVESTMENT_USDT = 1000.0
+INVESTMENT_USDT = 50.0
 MIN_NET_PCT = 0.0
 AUTO_SIM_THRESHOLD = 0.10
 AUTO_SIM_DOLLAR_MIN = 1.0
@@ -51,10 +51,10 @@ PAIRS = [
 ]
 
 NETWORKS = {
+    'BEP20':    {'fee_usd': 0.30, 'minutes': 3},
     'SOL':      {'fee_usd': 0.05, 'minutes': 1},
     'POLYGON':  {'fee_usd': 0.10, 'minutes': 3},
     'ARBITRUM': {'fee_usd': 0.15, 'minutes': 3},
-    'BEP20':    {'fee_usd': 0.30, 'minutes': 3},
     'TRC20':    {'fee_usd': 1.00, 'minutes': 2},
     'ERC20':    {'fee_usd': 4.00, 'minutes': 15},
 }

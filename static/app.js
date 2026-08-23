@@ -6,6 +6,7 @@ const EX_COLORS = {
 };
 
 let AUTO_ON = false;
+let MODE = 'paper';
 
 window.toggleAuto = async function() {
   const res = await api('/api/auto', { method: 'POST' });
@@ -13,12 +14,32 @@ window.toggleAuto = async function() {
   updateAutoUI();
 };
 
+window.toggleMode = async function() {
+  const res = await api('/api/mode', { method: 'POST' });
+  MODE = res.mode;
+  updateModeUI();
+};
+
+function updateModeUI() {
+  const check = $('modeCheck');
+  const label = $('modeLabel');
+  const status = $('modeStatus');
+  const wrap = document.querySelector('.mode-toggle-wrap');
+  if (check) check.checked = MODE === 'real';
+  if (label) label.textContent = MODE === 'real' ? 'Modo: REAL' : 'Modo: Paper';
+  if (status) {
+    status.textContent = MODE === 'real' ? '🔴 REAL' : '📝 Paper';
+    status.className = 'mode-status ' + (MODE === 'real' ? 'on' : 'off');
+  }
+  if (wrap) wrap.classList.toggle('real', MODE === 'real');
+}
+
 function updateAutoUI() {
   const check = $('autoCheck');
   const label = $('autoLabel');
   const status = $('autoStatus');
   if (check) check.checked = AUTO_ON;
-  if (label) label.textContent = AUTO_ON ? 'Modo: Automático' : 'Modo: Manual';
+  if (label) label.textContent = AUTO_ON ? 'Auto: ON' : 'Auto: OFF';
   if (status) {
     status.textContent = AUTO_ON ? '🤖 Auto ON' : '✋ Manual';
     status.className = 'auto-status ' + (AUTO_ON ? 'on' : 'off');
@@ -26,7 +47,7 @@ function updateAutoUI() {
   const rb = $('robotBadge');
   if (AUTO_ON) {
     rb.style.display = 'block';
-    rb.innerHTML = '🤖 Auto-TRADE LIGADO';
+    rb.innerHTML = MODE === 'real' ? '🔴 AUTO REAL LIGADO' : '🤖 Auto-TRADE LIGADO';
   }
 }
 
@@ -175,7 +196,9 @@ async function pollDashboard() {
     DASH = d;
 
     AUTO_ON = d.auto_trade;
+    MODE = d.mode || 'paper';
     updateAutoUI();
+    updateModeUI();
 
     const badge = $('connBadge');
     if (d.connected) badge.innerHTML = '<span class="dot on"></span> Scanner ao vivo';
@@ -196,6 +219,7 @@ async function pollDashboard() {
     renderPrices(d.prices, d.opportunities || [], d.exchanges_ok || []);
     fillSimSelects();
     renderBalSummary(d.balances || {});
+    renderPending(d.pending_transfers || []);
 
     if (b && b.net_usdt > 0) {
       const rb = $('robotBadge');
@@ -208,7 +232,9 @@ async function pollDashboard() {
     if (AUTO_ON) {
       const rb = $('robotBadge');
       rb.style.display = 'block';
-      rb.innerHTML = '🤖 Auto-TRADE LIGADO';
+      rb.innerHTML = MODE === 'real' ? '🔴 AUTO REAL LIGADO' : '🤖 Auto-TRADE LIGADO';
+    } else {
+      $('robotBadge').style.display = 'none';
     }
 
     if (d.total_simulations && d.total_simulations > totalSimOld) {
@@ -530,6 +556,71 @@ window.clearSettings = async function(eid) {
   msg.style.color = 'var(--green)';
   setTimeout(() => { msg.textContent = ''; }, 3000);
 };
+
+/* ---------- PENDING TRANSFERS ---------- */
+function renderPending(pending) {
+  const section = $('pendingSection');
+  const body = $('pendingBody');
+  if (!section || !body) return;
+
+  if (!pending || pending.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  body.innerHTML = pending.map(t => {
+    const color = EX_COLORS[t.from] || 'var(--text)';
+    const colorTo = EX_COLORS[t.to] || 'var(--text)';
+    return `
+    <div class="pending-card">
+      <div class="pending-row">
+        <span>Par</span><b>${t.pair}</b>
+      </div>
+      <div class="pending-row">
+        <span>Rota</span>
+        <b><span style="color:${color}">${t.from}</span> → <span style="color:${colorTo}">${t.to}</span></b>
+      </div>
+      <div class="pending-row">
+        <span>Quantidade</span><b style="color:var(--green)">${t.qty} USDT</b>
+      </div>
+      <div class="pending-row">
+        <span>Rede</span><b>${t.network} (~$${t.tx_fee_usd})</b>
+      </div>
+      <div class="pending-row">
+        <span>Status</span><b class="orange">${t.status}</b>
+      </div>
+
+      <div class="pending-step">
+        <span class="pending-step-num done">✓</span>
+        <span>Compra executada em ${t.from}</span>
+      </div>
+      <div class="pending-step">
+        <span class="pending-step-num active">2</span>
+        <span><b>Envie USDT de ${t.from} para ${t.to}</b></span>
+      </div>
+      <div class="pending-step">
+        <span class="pending-step-num wait">3</span>
+        <span>Venda automática em ${t.to} (quando detectar depósito)</span>
+      </div>
+
+      <div class="pending-instructions">
+        <b>📋 Passo a passo:</b><br>
+        1. Abra o app/site da <b>${t.from}</b><br>
+        2. Vá em <b>Carteira → Sacar → USDT</b><br>
+        3. Rede: <b>${t.network}</b><br>
+        4. Cole o endereço abaixo:<br>
+        <div class="pending-addr">
+          ${t.deposit_address}
+          <button class="btn-copy" onclick="navigator.clipboard.writeText('${t.deposit_address}').then(()=>this.textContent='Copiado!')">📋 Copiar</button>
+        </div>
+        ${t.deposit_tag ? `<div class="pending-addr">TAG/MEMO: ${t.deposit_tag}</div>` : ''}
+        5. Envie <b>${t.qty} USDT</b><br>
+        6. O sistema detecta automaticamente e vende em ${t.to}
+      </div>
+    </div>`;
+  }).join('');
+}
 
 /* ---------- BALANCES ---------- */
 function renderBalSummary(balances) {

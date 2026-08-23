@@ -108,7 +108,7 @@ class Scanner:
                     opts['password'] = passphrase
 
                 ex = getattr(ccxt, eid)(opts)
-                if is_cloud and eid in ('binance', 'bybit'):
+                if eid in ('binance', 'bybit'):
                     try:
                         ex.load_markets()
                     except Exception:
@@ -410,5 +410,39 @@ class Scanner:
                 else:
                     balances[eid] = {'ok': True, 'coins': {}, 'note': 'conta vazia'}
             except Exception as e:
-                balances[eid] = {'error': str(e)[:100]}
+                balances[eid] = {'error': str(e)[:120]}
+
+        import os
+        mb_key = os.environ.get('MERCADOBITCOIN_API_KEY', '')
+        mb_secret = os.environ.get('MERCADOBITCOIN_SECRET_KEY', '')
+        if mb_key and mb_secret:
+            try:
+                import hmac, hashlib, time as _t, requests as _req
+                ts = str(int(_t.time()))
+                msg = f'{mb_key}{ts}'
+                sign = hmac.new(mb_secret.encode(), msg.encode(), hashlib.sha256).hexdigest()
+                r = _req.get(
+                    'https://api.mercadobitcoin.net/api/v4/my-balance/',
+                    headers={
+                        'API-Key': mb_key,
+                        'API-Sign': sign,
+                        'Timestamp': ts,
+                    },
+                    timeout=10,
+                )
+                data = r.json()
+                coins = {}
+                for item in data.get('balances', []):
+                    coin = item.get('currency', '')
+                    free = float(item.get('available', 0))
+                    locked = float(item.get('locked', 0))
+                    total = free + locked
+                    if total > 0:
+                        coins[coin] = {'free': round(free, 8), 'used': round(locked, 8), 'total': round(total, 8)}
+                balances['mercadobitcoin'] = {'ok': True, 'coins': coins} if coins else {'ok': True, 'coins': {}, 'note': 'conta vazia'}
+            except Exception as e:
+                balances['mercadobitcoin'] = {'error': str(e)[:120]}
+        else:
+            balances['mercadobitcoin'] = {'error': 'sem API key/secret'}
+
         return balances

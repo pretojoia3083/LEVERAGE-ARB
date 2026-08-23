@@ -53,13 +53,17 @@ def startup():
 
                 if AUTO_TRADE and opps:
                     best = opps[0]
-                    if best['net_usdt'] > 0:
-                        print(f"[AUTO] Executando {best['pair']} {best['buy_exchange']}->{best['sell_exchange']} +{best['net_pct']}%")
+                    min_pct = 0.30 if executor.mode == 'real' else config.AUTO_SIM_THRESHOLD
+                    if best['net_pct'] >= min_pct and best['net_usdt'] > 0:
+                        print(f"[AUTO] Executando {best['pair']} {best['buy_exchange']}->{best['sell_exchange']} +{best['net_pct']}% ({executor.mode})")
                         executor.execute(
                             scanner, best['pair'],
                             best['buy_exchange'], best['sell_exchange'],
                             best['invest_usdt'], best['network'],
                         )
+
+                if executor.mode == 'real':
+                    executor.check_deposits(scanner)
             except Exception as e:
                 print(f"[ERRO] scan: {e}")
             time.sleep(config.SCAN_INTERVAL)
@@ -86,19 +90,18 @@ def dashboard():
     snap = scanner.snapshot()
     snap['investment'] = config.INVESTMENT_USDT
     snap['auto_trade'] = AUTO_TRADE
+    snap['mode'] = executor.mode
+    snap['pending_transfers'] = executor.get_pending()
     stats = db.stats()
     snap['total_simulations'] = stats.get('total_simulations', 0)
     snap['total_executions'] = stats.get('total_executions', 0)
-    try:
-        snap['balances'] = scanner.fetch_balances()
-    except Exception:
-        snap['balances'] = {}
+    snap['balances'] = {}
     return snap
 
 
 @app.get("/api/auto")
 def get_auto():
-    return {'auto_trade': AUTO_TRADE}
+    return {'auto_trade': AUTO_TRADE, 'mode': executor.mode}
 
 
 @app.post("/api/auto")
@@ -106,7 +109,25 @@ def set_auto():
     global AUTO_TRADE
     AUTO_TRADE = not AUTO_TRADE
     print(f"[AUTO] {'LIGADO' if AUTO_TRADE else 'DESLIGADO'}")
-    return {'auto_trade': AUTO_TRADE}
+    return {'auto_trade': AUTO_TRADE, 'mode': executor.mode}
+
+
+@app.get("/api/mode")
+def get_mode():
+    return {'mode': executor.mode}
+
+
+@app.post("/api/mode")
+def set_mode():
+    new_mode = 'real' if executor.mode == 'paper' else 'paper'
+    executor.set_mode(new_mode)
+    print(f"[MODE] Alterado para: {new_mode}")
+    return {'mode': new_mode}
+
+
+@app.get("/api/pending")
+def get_pending():
+    return {'data': executor.get_pending()}
 
 
 @app.get("/api/balances")
