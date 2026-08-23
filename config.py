@@ -1,5 +1,15 @@
 import os
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+BITGET_API_KEY = os.environ.get('BITGET_API_KEY', '')
+BITGET_SECRET_KEY = os.environ.get('BITGET_SECRET_KEY', '')
+BITGET_PASSPHRASE = os.environ.get('BITGET_PASSPHRASE', '')
+
 INVESTMENT_USDT = 1000.0
 MIN_NET_PCT = 0.0
 AUTO_SIM_THRESHOLD = 0.10

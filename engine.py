@@ -90,6 +90,11 @@ class Scanner:
                 }
                 if eid in ('binance', 'htx'):
                     opts['options']['fetchMarkets'] = ['spot']
+                if eid == 'bitget' and config.BITGET_API_KEY:
+                    opts['apiKey'] = config.BITGET_API_KEY
+                    opts['secret'] = config.BITGET_SECRET_KEY
+                    if config.BITGET_PASSPHRASE:
+                        opts['password'] = config.BITGET_PASSPHRASE
                 ex = getattr(ccxt, eid)(opts)
                 ex.load_markets()
                 return eid, ex
