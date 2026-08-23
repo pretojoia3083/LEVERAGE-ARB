@@ -79,13 +79,14 @@ class Scanner:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         targets = [e for e in config.EXCHANGES if e != 'mercadobitcoin']
-        deadline = time.time() + 150
+        is_cloud = config.IS_CLOUD
+        deadline = time.time() + (200 if is_cloud else 150)
 
         def _load(eid):
             try:
                 opts = {
                     'enableRateLimit': True,
-                    'timeout': 20000,
+                    'timeout': 40000 if is_cloud else 20000,
                     'options': {'defaultType': 'spot'},
                 }
                 if eid in ('binance', 'htx'):
@@ -105,7 +106,7 @@ class Scanner:
                 return eid, None
 
         loaded = {}
-        pool = ThreadPoolExecutor(max_workers=3)
+        pool = ThreadPoolExecutor(max_workers=2 if is_cloud else 3)
         fut_to_eid = {pool.submit(_load, eid): eid for eid in targets}
         remaining = []
         try:

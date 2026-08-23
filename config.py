@@ -24,6 +24,7 @@ IS_CLOUD = os.environ.get('RENDER') is not None
 
 EXCHANGES = [
     'binance', 'bybit', 'bitget', 'okx', 'gate', 'mexc',
+    'kucoin', 'kraken',
 ] if IS_CLOUD else [
     'binance', 'bybit', 'bitget', 'kucoin',
     'okx', 'gate', 'mexc', 'htx', 'kraken',
