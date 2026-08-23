@@ -220,25 +220,19 @@ class Scanner:
                 self.errors['mercadobitcoin'] = str(e)[:120]
         return None
 
-    def _fetch_direct(self, eid):
-        import requests
+    def _fetch_direct(self, eid, ex):
         pair = 'USDT/BRL'
         try:
             if eid == 'binance':
-                r = requests.get('https://api.binance.com/api/v3/ticker/price',
-                                 params={'symbol': 'USDTBRL'}, timeout=10,
-                                 headers={'User-Agent': 'Mozilla/5.0'})
-                d = r.json()
+                d = ex.publicGetTickerPrice({'symbol': 'USDTBRL'})
                 price = float(d.get('price', 0))
                 if price > 0:
-                    return {pair: {'ask': price, 'bid': price}}
+                    spread = price * 0.0005
+                    return {pair: {'ask': price + spread, 'bid': price - spread}}
                 with self.lock:
                     self.errors[eid] = f'binance api: {str(d)[:100]}'
             elif eid == 'bybit':
-                r = requests.get('https://api.bybit.com/v5/market/tickers',
-                                 params={'category': 'spot', 'symbol': 'USDTBRL'},
-                                 timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
-                d = r.json()
+                d = ex.publicGetV5MarketTickers({'category': 'spot', 'symbol': 'USDTBRL'})
                 items = d.get('result', {}).get('list', [])
                 if items:
                     t = items[0]
@@ -248,9 +242,11 @@ class Scanner:
                         return {pair: {'ask': ask, 'bid': bid}}
                 with self.lock:
                     self.errors[eid] = f'bybit api: {str(d)[:100]}'
+            else:
+                return None
         except Exception as e:
             with self.lock:
-                self.errors[eid] = f'{eid} direct: {str(e)[:100]}'
+                self.errors[eid] = f'{eid} direct error: {str(e)[:100]}'
         return None
 
     def snapshot(self):
@@ -295,7 +291,7 @@ class Scanner:
                 except Exception:
                     pass
             if not m:
-                direct = self._fetch_direct(eid)
+                direct = self._fetch_direct(eid, ex)
                 if direct:
                     m = direct
             if not m:
