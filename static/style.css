@@ -240,8 +240,54 @@ html, body {
   .best-panel, .sim-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
-  .sidebar { width: 64px; padding: 16px 8px; }
-  .logo-text, .menu-label, .menu-item span+*, .foot-info, .live-badge { display: none; }
-  .content { padding: 20px 16px; }
-  .grid-4, .grid-3 { grid-template-columns: 1fr; }
+  .layout { flex-direction: column; }
+  .sidebar {
+    width: 100%; height: auto; position: relative;
+    flex-direction: row; padding: 12px; gap: 8px;
+    border-right: none; border-bottom: 1px solid var(--border);
+    overflow-x: auto; overflow-y: hidden;
+  }
+  .logo-row { display: none; }
+  .menu { flex-direction: row; gap: 4px; flex: 1; }
+  .menu-label { display: none; }
+  .menu-item {
+    padding: 8px 14px; font-size: 13px; white-space: nowrap;
+    border-radius: 8px;
+  }
+  .menu-item span:first-child { display: inline; }
+  .sidebar-foot { display: none; }
+  .content { padding: 16px 12px; max-width: 100%; }
+  .grid-4, .grid-3 { grid-template-columns: 1fr 1fr; }
+  .page-head h1 { font-size: 20px; }
+  .card-value { font-size: 22px; }
+  .best-panel { grid-template-columns: 1fr; gap: 16px; padding: 16px; }
+  .best-pair { font-size: 22px; }
+  .sim-grid { grid-template-columns: 1fr; }
+  .tbl { font-size: 12px; }
+  .tbl th, .tbl td { padding: 8px 10px; }
+  .btn-exec { padding: 6px 10px; font-size: 11px; }
+  .prices-grid { grid-template-columns: 1fr 1fr !important; }
 }
+@media (max-width: 420px) {
+  .grid-4, .grid-3 { grid-template-columns: 1fr; }
+  .prices-grid { grid-template-columns: 1fr !important; }
+}
+
+/* PRICES SECTION */
+.prices-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  margin-bottom: 20px;
+}
+.price-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; text-align: center;
+  transition: all .2s;
+}
+.price-card:hover { border-color: var(--orange); transform: translateY(-1px); }
+.price-card .ex-name {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; margin-bottom: 8px;
+}
+.price-card .price-ask { font-size: 11px; color: var(--green); }
+.price-card .price-bid { font-size: 11px; color: var(--orange); }
+.price-card .price-spread { font-size: 10px; color: var(--muted); margin-top: 4px; }

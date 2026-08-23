@@ -63,7 +63,7 @@ function renderBest(best) {
   const el = $('bestPanel');
   if (!best) {
     el.className = 'best-empty muted';
-    el.textContent = 'Nenhuma oportunidade no momento. O scanner monitora 11 corretoras × 10 ativos continuamente...';
+    el.textContent = 'Nenhuma oportunidade no momento. O scanner monitora 8 corretoras × USDT/BRL continuamente...';
     return;
   }
   el.className = '';
@@ -130,6 +130,31 @@ function renderOpps(list) {
     </tr>`).join('');
 }
 
+function renderPrices(prices) {
+  const grid = $('pricesGrid');
+  if (!prices || !Object.keys(prices).length) {
+    grid.innerHTML = '<div class="muted" style="grid-column:1/-1;text-align:center;padding:20px">Aguardando preços...</div>';
+    return;
+  }
+  const exOrder = ['binance', 'bybit', 'bitget', 'okx', 'gate', 'mexc', 'kucoin', 'kraken'];
+  const sorted = Object.keys(prices).sort((a, b) => {
+    const ia = exOrder.indexOf(a), ib = exOrder.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  grid.innerHTML = sorted.map(ex => {
+    const data = prices[ex];
+    const pair = data && data['USDT/BRL'];
+    if (!pair) return `<div class="price-card"><div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div><div class="muted small">sem par</div></div>`;
+    const spread = pair.ask && pair.bid ? (((pair.ask - pair.bid) / pair.bid) * 100).toFixed(3) : '—';
+    return `<div class="price-card">
+      <div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div>
+      <div class="price-ask">ask ${fmtPrice(pair.ask)}</div>
+      <div class="price-bid">bid ${fmtPrice(pair.bid)}</div>
+      <div class="price-spread">spread ${spread}%</div>
+    </div>`;
+  }).join('');
+}
+
 async function pollDashboard() {
   try {
     const d = await api('/api/dashboard');
@@ -155,6 +180,7 @@ async function pollDashboard() {
 
     renderBest(b);
     renderOpps(d.opportunities || []);
+    renderPrices(d.prices);
     fillSimSelects();
 
     if (b && b.net_usdt > 0) {
