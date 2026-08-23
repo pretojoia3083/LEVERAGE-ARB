@@ -243,7 +243,11 @@ class Scanner:
                 with self.lock:
                     self.errors[eid] = f'bybit api: {str(d)[:100]}'
             elif eid == 'mexc':
-                d = ex.publicGetTicker24hr({'symbol': 'BRLUSDT'})
+                import requests as _req
+                r = _req.get('https://api.mexc.com/api/v3/ticker/24hr',
+                             params={'symbol': 'BRLUSDT'}, timeout=10,
+                             headers={'User-Agent': 'Mozilla/5.0'})
+                d = r.json()
                 brl_ask = float(d.get('askPrice', 0))
                 brl_bid = float(d.get('bidPrice', 0))
                 if brl_ask > 0 and brl_bid > 0:
