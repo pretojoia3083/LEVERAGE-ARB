@@ -222,13 +222,19 @@ class Scanner:
 
     def snapshot(self):
         with self.lock:
+            all_prices = {}
+            for eid in self.exchanges:
+                if eid in self.prices:
+                    all_prices[eid] = self.prices[eid]
+                else:
+                    all_prices[eid] = {}
             return {
                 'connected': self.connected,
                 'last_scan': self.last_scan,
                 'scan_seconds': self.scan_seconds,
                 'exchanges_ok': sorted(self.exchanges.keys()),
                 'errors': dict(self.errors),
-                'prices': self.prices,
+                'prices': all_prices,
                 'opportunities': self.opportunities[:config.TOP_LIMIT],
                 'total_opportunities': len(self.opportunities),
                 'best': self.opportunities[0] if self.opportunities else None,

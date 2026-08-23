@@ -63,45 +63,20 @@ function renderBest(best) {
   const el = $('bestPanel');
   if (!best) {
     el.className = 'best-empty muted';
-    el.textContent = 'Nenhuma oportunidade no momento. O scanner monitora 8 corretoras × USDT/BRL continuamente...';
+    el.textContent = 'Nenhuma oportunidade no momento.';
     return;
   }
   el.className = '';
   el.innerHTML = `
-    <div class="best-panel">
-      <div class="best-left">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="best-pair font-display">${best.pair}</span>
-          <span class="badge badge-green">${best.net_pct}% líquido</span>
-        </div>
-        <div class="best-row"><span>Spread bruto</span><b>${best.gross_pct}%</b></div>
-        <div class="best-row"><span>Taxas taker</span><b>${((best.taker_buy + best.taker_sell) * 100).toFixed(3)}%</b></div>
-        <div class="best-row"><span>Rede escolhida (auto)</span><b>${best.network} · taxa saque $${best.networks.find(n => n.network === best.network)?.withdrawal_fee_usd ?? '—'}</b></div>
-        <div class="time-chip">⏱ Tempo estimado da operação: ${best.est_time_fmt}</div>
-        <div class="best-row"><span>Investimento base</span><b>${fmtUsd(best.invest_usdt)}</b></div>
-        <div class="best-total">
-          <span>Lucro líquido</span>
-          <b class="${best.net_usdt >= 0 ? 'green' : 'red'}">${fmtUsd(best.net_usdt)}</b>
-        </div>
-        <button class="btn-exec" style="padding:12px;font-size:15px;border-radius:10px"
-          onclick="execRoute('${best.pair}','${best.buy_exchange}','${best.sell_exchange}')">⚡ EXECUTAR ESTA OPERAÇÃO</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px;justify-content:center">
-        <div class="side-box side-buy">
-          <div class="side-title green">🟢 Comprar em</div>
-          ${exBadge(best.buy_exchange)}
-          <div class="best-price-row">
-            <div><div class="muted small">Preço (ask)</div><div class="best-price font-display">${fmtPrice(best.buy_price)}</div></div>
-          </div>
-        </div>
-        <div style="text-align:center;color:var(--muted)">⬇️</div>
-        <div class="side-box side-sell">
-          <div class="side-title orange">🟠 Vender em</div>
-          ${exBadge(best.sell_exchange)}
-          <div class="best-price-row">
-            <div><div class="muted small">Preço (bid)</div><div class="best-price font-display">${fmtPrice(best.sell_price)}</div></div>
-          </div>
-        </div>
+    <div class="best-compact">
+      <div class="best-route-row" style="padding:0 20px 16px;flex-wrap:wrap;gap:8px;align-items:center">
+        ${exBadge(best.buy_exchange)} <span class="muted small">@${fmtPrice(best.buy_price)}</span>
+        <span class="arrow">→</span>
+        ${exBadge(best.sell_exchange)} <span class="muted small">@${fmtPrice(best.sell_price)}</span>
+        <span class="badge badge-green" style="margin-left:auto">${best.gross_pct}% spread</span>
+        <span class="badge badge-orange">⏱ ${best.est_time_fmt}</span>
+        <b class="${best.net_usdt >= 0 ? 'green' : 'red'} font-display" style="font-size:18px">${fmtUsd(best.net_usdt)}</b>
+        <button class="btn-exec" onclick="execRoute('${best.pair}','${best.buy_exchange}','${best.sell_exchange}')">⚡ Executar</button>
       </div>
     </div>`;
 }
@@ -130,27 +105,37 @@ function renderOpps(list) {
     </tr>`).join('');
 }
 
-function renderPrices(prices) {
+function renderPrices(prices, opps, exchangesOk) {
   const grid = $('pricesGrid');
-  if (!prices || !Object.keys(prices).length) {
-    grid.innerHTML = '<div class="muted" style="grid-column:1/-1;text-align:center;padding:20px">Aguardando preços...</div>';
-    return;
-  }
-  const exOrder = ['binance', 'bybit', 'bitget', 'okx', 'gate', 'mexc', 'kucoin', 'kraken'];
-  const sorted = Object.keys(prices).sort((a, b) => {
-    const ia = exOrder.indexOf(a), ib = exOrder.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  if (!grid) return;
+
+  const activeExs = new Set();
+  (opps || []).forEach(o => {
+    activeExs.add(o.buy_exchange);
+    activeExs.add(o.sell_exchange);
   });
-  grid.innerHTML = sorted.map(ex => {
-    const data = prices[ex];
+
+  const ALL_EX = ['binance', 'bybit', 'bitget', 'okx', 'gate', 'mexc', 'kucoin', 'kraken', 'mercadobitcoin'];
+  grid.innerHTML = ALL_EX.map(ex => {
+    const isConnected = (exchangesOk || []).includes(ex) || ex === 'mercadobitcoin';
+    const data = prices && prices[ex];
     const pair = data && data['USDT/BRL'];
-    if (!pair) return `<div class="price-card"><div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div><div class="muted small">sem par</div></div>`;
+    const isActive = activeExs.has(ex);
+    const isMB = ex === 'mercadobitcoin';
+
+    if (!pair || !pair.ask) {
+      return `<div class="price-card${isConnected ? '' : ' offline'}">
+        <div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div>
+        <div class="price-ask muted">${isConnected ? 'aguardando...' : 'offline'}</div>
+      </div>`;
+    }
     const spread = pair.ask && pair.bid ? (((pair.ask - pair.bid) / pair.bid) * 100).toFixed(3) : '—';
-    return `<div class="price-card">
+    return `<div class="price-card${isActive ? ' active' : ''}">
       <div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div>
       <div class="price-ask">ask ${fmtPrice(pair.ask)}</div>
       <div class="price-bid">bid ${fmtPrice(pair.bid)}</div>
       <div class="price-spread">spread ${spread}%</div>
+      ${isActive ? '<div class="price-tag">OPORTUNIDADE</div>' : ''}
     </div>`;
   }).join('');
 }
@@ -180,7 +165,7 @@ async function pollDashboard() {
 
     renderBest(b);
     renderOpps(d.opportunities || []);
-    renderPrices(d.prices);
+    renderPrices(d.prices, d.opportunities || [], d.exchanges_ok || []);
     fillSimSelects();
 
     if (b && b.net_usdt > 0) {
@@ -203,10 +188,16 @@ async function pollDashboard() {
 /* ---------- SIMULADOR ---------- */
 function fillSimSelects() {
   if (!DASH) return;
+  const pricesWithData = {};
+  for (const [ex, data] of Object.entries(DASH.prices || {})) {
+    if (data && data['USDT/BRL'] && data['USDT/BRL'].ask) {
+      pricesWithData[ex] = data;
+    }
+  }
   const pairs = Object.keys(
-    Object.values(DASH.prices)[0] || {}
+    Object.values(pricesWithData)[0] || {}
   ).sort();
-  const exs = Object.keys(DASH.prices);
+  const exs = Object.keys(pricesWithData);
 
   const keep = (sel, arr, val) => {
     sel.innerHTML = arr.map(x => `<option value="${x}">${x}</option>`).join('');
