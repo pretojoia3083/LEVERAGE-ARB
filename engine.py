@@ -100,7 +100,8 @@ class Scanner:
                     opts['apiKey'] = config.BINANCE_API_KEY
                     opts['secret'] = config.BINANCE_SECRET_KEY
                 ex = getattr(ccxt, eid)(opts)
-                ex.load_markets()
+                if not (is_cloud and eid == 'binance'):
+                    ex.load_markets()
                 return eid, ex
             except Exception:
                 return eid, None
@@ -120,6 +121,25 @@ class Scanner:
                 else:
                     remaining.append(eid)
                     print(f"[LEVERAGE ARB] {eid} falhou")
+            if len(loaded) < 3:
+                for eid in remaining[:]:
+                    if time.time() > deadline:
+                        break
+                    try:
+                        opts = {
+                            'enableRateLimit': True,
+                            'timeout': 60000,
+                            'options': {'defaultType': 'spot'},
+                        }
+                        if eid == 'binance' and config.BINANCE_API_KEY:
+                            opts['apiKey'] = config.BINANCE_API_KEY
+                            opts['secret'] = config.BINANCE_SECRET_KEY
+                        ex = getattr(ccxt, eid)(opts)
+                        loaded[eid] = ex
+                        remaining.remove(eid)
+                        print(f"[LEVERAGE ARB] {eid} conectado (retry)")
+                    except Exception:
+                        print(f"[LEVERAGE ARB] {eid} retry falhou")
         else:
             pool = ThreadPoolExecutor(max_workers=3)
             fut_to_eid = {pool.submit(_load, eid): eid for eid in targets}
