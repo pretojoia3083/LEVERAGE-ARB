@@ -250,17 +250,22 @@ class Scanner:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         def _fetch(eid, ex):
-            try:
-                wanted = list(config.PAIRS)
-                tickers = ex.fetch_tickers(wanted)
-                m = {}
-                for pair in wanted:
-                    t = tickers.get(pair)
+            m = {}
+            for pair in config.PAIRS:
+                try:
+                    t = ex.fetch_ticker(pair)
                     if t and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
                         m[pair] = {'ask': t['ask'], 'bid': t['bid']}
-                return eid, m, None
-            except Exception as e:
-                return eid, None, str(e)[:120]
+                except Exception:
+                    try:
+                        t = ex.fetch_ticker(pair.replace('/', ''))
+                        if t and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
+                            m[pair] = {'ask': t['ask'], 'bid': t['bid']}
+                    except Exception:
+                        pass
+            if not m:
+                return eid, None, f'{eid} USDT/BRL not available'
+            return eid, m, None
 
         items = list(self.exchanges.items())
 
