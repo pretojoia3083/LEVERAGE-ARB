@@ -229,45 +229,14 @@ class Scanner:
                 d = r.json()
                 price = float(d.get('price', 0))
                 if price > 0:
-                    return {pair: {'ask': price, 'bid': price * 0.999}}
+                    return {pair: {'ask': price, 'bid': price}}
             elif eid == 'bybit':
                 r = requests.get('https://api.bybit.com/v5/market/tickers', params={'category': 'spot', 'symbol': 'USDTBRL'}, timeout=10)
                 items = r.json().get('result', {}).get('list', [])
                 if items:
                     t = items[0]
-                    ask = float(t.get('askPrice', 0))
-                    bid = float(t.get('bidPrice', 0))
-                    if ask > 0 and bid > 0:
-                        return {pair: {'ask': ask, 'bid': bid}}
-            elif eid == 'gate':
-                r = requests.get('https://api.gateio.ws/api/v4/spot/tickers', params={'currency_pair': 'USDT_BRL'}, timeout=10)
-                d = r.json()
-                if isinstance(d, list) and d:
-                    t = d[0]
-                    ask = float(t.get('lowest_ask', 0))
-                    bid = float(t.get('highest_bid', 0))
-                    if ask > 0 and bid > 0:
-                        return {pair: {'ask': ask, 'bid': bid}}
-            elif eid == 'mexc':
-                r = requests.get('https://api.mexc.com/api/v3/ticker/bookTicker', params={'symbol': 'USDTBRL'}, timeout=10)
-                d = r.json()
-                ask = float(d.get('askPrice', 0))
-                bid = float(d.get('bidPrice', 0))
-                if ask > 0 and bid > 0:
-                    return {pair: {'ask': ask, 'bid': bid}}
-            elif eid == 'kucoin':
-                r = requests.get('https://api.kucoin.com/api/v1/market/orderbook/level1', params={'symbol': 'USDT-BRL'}, timeout=10)
-                d = r.json().get('data', {})
-                ask = float(d.get('ask', 0))
-                bid = float(d.get('bid', 0))
-                if ask > 0 and bid > 0:
-                    return {pair: {'ask': ask, 'bid': bid}}
-            elif eid == 'kraken':
-                r = requests.get('https://api.kraken.com/0/public/Ticker', params={'pair': 'USDTBRL'}, timeout=10)
-                d = r.json().get('result', {})
-                for k, v in d.items():
-                    ask = float(v.get('a', [0])[0])
-                    bid = float(v.get('b', [0])[0])
+                    ask = float(t.get('ask1Price', 0))
+                    bid = float(t.get('bid1Price', 0))
                     if ask > 0 and bid > 0:
                         return {pair: {'ask': ask, 'bid': bid}}
         except Exception:
