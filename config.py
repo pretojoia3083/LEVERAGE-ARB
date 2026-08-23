@@ -9,6 +9,8 @@ except ImportError:
 BITGET_API_KEY = os.environ.get('BITGET_API_KEY', '')
 BITGET_SECRET_KEY = os.environ.get('BITGET_SECRET_KEY', '')
 BITGET_PASSPHRASE = os.environ.get('BITGET_PASSPHRASE', '')
+BINANCE_API_KEY = os.environ.get('BINANCE_API_KEY', '')
+BINANCE_SECRET_KEY = os.environ.get('BINANCE_SECRET_KEY', '')
 
 INVESTMENT_USDT = 1000.0
 MIN_NET_PCT = 0.0

@@ -95,6 +95,9 @@ class Scanner:
                     opts['secret'] = config.BITGET_SECRET_KEY
                     if config.BITGET_PASSPHRASE:
                         opts['password'] = config.BITGET_PASSPHRASE
+                if eid == 'binance' and config.BINANCE_API_KEY:
+                    opts['apiKey'] = config.BINANCE_API_KEY
+                    opts['secret'] = config.BINANCE_SECRET_KEY
                 ex = getattr(ccxt, eid)(opts)
                 ex.load_markets()
                 return eid, ex
