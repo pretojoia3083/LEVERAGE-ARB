@@ -51,12 +51,12 @@ PAIRS = [
 ]
 
 NETWORKS = {
-    'BEP20':    {'fee_usd': 0.30, 'minutes': 3},
-    'SOL':      {'fee_usd': 0.05, 'minutes': 1},
-    'POLYGON':  {'fee_usd': 0.10, 'minutes': 3},
-    'ARBITRUM': {'fee_usd': 0.15, 'minutes': 3},
-    'TRC20':    {'fee_usd': 1.00, 'minutes': 2},
-    'ERC20':    {'fee_usd': 4.00, 'minutes': 15},
+    'BEP20':    {'fee_usd': 0.15, 'minutes': 3},
+    'SOL':      {'fee_usd': 0.30, 'minutes': 1},
+    'POLYGON':  {'fee_usd': 0.07, 'minutes': 3},
+    'ARBITRUM': {'fee_usd': 0.10, 'minutes': 3},
+    'TRC20':    {'fee_usd': 1.50, 'minutes': 2},
+    'ERC20':    {'fee_usd': 3.50, 'minutes': 15},
 }
 
 BUY_SECONDS = 2

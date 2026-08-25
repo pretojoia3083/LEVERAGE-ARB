@@ -9,45 +9,51 @@ let AUTO_ON = false;
 let MODE = 'paper';
 
 window.toggleAuto = async function() {
+  const btn = $('autoBtn');
+  btn.textContent = 'Carregando...';
+  btn.disabled = true;
   const res = await api('/api/auto', { method: 'POST' });
   AUTO_ON = res.auto_trade;
   updateAutoUI();
+  btn.disabled = false;
 };
 
 window.toggleMode = async function() {
+  const btn = $('modeBtn');
+  btn.textContent = 'Carregando...';
+  btn.disabled = true;
   const res = await api('/api/mode', { method: 'POST' });
   MODE = res.mode;
   updateModeUI();
+  btn.disabled = false;
 };
 
 function updateModeUI() {
-  const check = $('modeCheck');
+  const btn = $('modeBtn');
   const label = $('modeLabel');
-  const status = $('modeStatus');
-  const wrap = document.querySelector('.mode-toggle-wrap');
-  if (check) check.checked = MODE === 'real';
-  if (label) label.textContent = MODE === 'real' ? 'Modo: REAL' : 'Modo: Paper';
-  if (status) {
-    status.textContent = MODE === 'real' ? '🔴 REAL' : '📝 Paper';
-    status.className = 'mode-status ' + (MODE === 'real' ? 'on' : 'off');
+  const wrap = $('modeWrap');
+  if (btn) {
+    btn.textContent = MODE === 'real' ? '🔴 REAL' : '📝 Paper';
+    btn.className = 'toggle-btn ' + (MODE === 'real' ? 'active-red' : '');
   }
+  if (label) label.textContent = MODE === 'real' ? 'Modo: REAL' : 'Modo: Paper';
   if (wrap) wrap.classList.toggle('real', MODE === 'real');
 }
 
 function updateAutoUI() {
-  const check = $('autoCheck');
+  const btn = $('autoBtn');
   const label = $('autoLabel');
-  const status = $('autoStatus');
-  if (check) check.checked = AUTO_ON;
-  if (label) label.textContent = AUTO_ON ? 'Auto: ON' : 'Auto: OFF';
-  if (status) {
-    status.textContent = AUTO_ON ? '🤖 Auto ON' : '✋ Manual';
-    status.className = 'auto-status ' + (AUTO_ON ? 'on' : 'off');
+  if (btn) {
+    btn.textContent = AUTO_ON ? '🤖 Auto ON' : '✋ Manual';
+    btn.className = 'toggle-btn ' + (AUTO_ON ? 'active-green' : '');
   }
+  if (label) label.textContent = AUTO_ON ? 'Auto: ON' : 'Auto: OFF';
   const rb = $('robotBadge');
   if (AUTO_ON) {
     rb.style.display = 'block';
     rb.innerHTML = MODE === 'real' ? '🔴 AUTO REAL LIGADO' : '🤖 Auto-TRADE LIGADO';
+  } else {
+    rb.style.display = 'none';
   }
 }
 

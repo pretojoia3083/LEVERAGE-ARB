@@ -66,21 +66,13 @@
           <p class="muted">Compre barato em uma corretora, venda caro em outra — com detecção automática da rede mais barata</p>
         </div>
         <div class="controls-wrap">
-          <div class="mode-toggle-wrap">
+          <div class="mode-toggle-wrap" id="modeWrap">
             <span class="muted small" id="modeLabel">Modo: Paper</span>
-            <label class="auto-toggle" id="modeToggle" onclick="toggleMode()">
-              <input type="checkbox" id="modeCheck">
-              <span class="auto-slider"></span>
-            </label>
-            <span class="mode-status" id="modeStatus">📝 Paper</span>
+            <button class="toggle-btn" id="modeBtn" onclick="toggleMode()">📝 Paper</button>
           </div>
-          <div class="auto-toggle-wrap">
+          <div class="auto-toggle-wrap" id="autoWrap">
             <span class="muted small" id="autoLabel">Auto: OFF</span>
-            <label class="auto-toggle" id="autoToggle" onclick="toggleAuto()">
-              <input type="checkbox" id="autoCheck">
-              <span class="auto-slider"></span>
-            </label>
-            <span class="auto-status" id="autoStatus">✋ Manual</span>
+            <button class="toggle-btn" id="autoBtn" onclick="toggleAuto()">✋ Manual</button>
           </div>
         </div>
       </div>

@@ -448,6 +448,21 @@ html, body {
   border-color: rgba(239,68,68,.5);
   background: rgba(239,68,68,.08);
 }
+.toggle-btn {
+  padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: all .2s; font-family: inherit;
+  min-width: 120px; text-align: center;
+}
+.toggle-btn:hover { border-color: var(--accent); }
+.toggle-btn.active-green {
+  background: rgba(16,185,129,.15); border-color: var(--green);
+  color: var(--green);
+}
+.toggle-btn.active-red {
+  background: rgba(239,68,68,.15); border-color: var(--red);
+  color: var(--red);
+}
 .auto-toggle {
   position: relative; width: 48px; height: 26px; cursor: pointer;
 }
