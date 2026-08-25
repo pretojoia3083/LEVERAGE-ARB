@@ -220,6 +220,7 @@ html, body {
 @media (max-width: 1100px) {
   .grid-4, .grid-3 { grid-template-columns: repeat(2,1fr); }
   .sim-grid { grid-template-columns: 1fr; }
+  .calc-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
   .layout { flex-direction: column; }
@@ -527,4 +528,39 @@ html, body {
   background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.3);
   color: var(--green); border-radius: 6px; padding: 4px 10px;
   font-size: 11px; font-weight: 600; cursor: pointer;
+}
+
+/* CALCULATOR */
+.calc-grid {
+  display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 0 20px 20px;
+}
+.calc-inputs { display: flex; flex-direction: column; gap: 12px; }
+.calc-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.calc-preset {
+  padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .2s; font-family: inherit;
+}
+.calc-preset:hover { border-color: var(--accent); color: var(--text); }
+.calc-result {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 20px;
+}
+.calc-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; font-size: 13px;
+}
+.calc-row span { color: var(--muted); }
+.calc-row b { color: var(--text); }
+.calc-divider {
+  height: 1px; background: var(--border); margin: 6px 0;
+}
+.calc-final {
+  padding: 10px 0 6px;
+}
+.calc-final b {
+  font-size: 20px; font-family: 'Space Grotesk', sans-serif;
+}
+.calc-final span {
+  font-size: 14px; font-weight: 600; color: var(--text);
 }

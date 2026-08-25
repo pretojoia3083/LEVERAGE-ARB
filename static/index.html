@@ -110,6 +110,40 @@
 
       <div class="card p5">
         <div class="card-head noborder">
+          <h2>🧮 Calculadora de Lucro</h2>
+          <span class="muted small">Simule quanto você ganharia com arbitragem</span>
+        </div>
+        <div class="calc-grid">
+          <div class="calc-inputs">
+            <label class="label">Valor em BRL</label>
+            <input type="number" id="calcAmount" class="input" value="1000" min="10" step="50" oninput="calcProfit()">
+            <div class="calc-presets">
+              <button class="calc-preset" onclick="setCalcAmount(50)">R$50</button>
+              <button class="calc-preset" onclick="setCalcAmount(100)">R$100</button>
+              <button class="calc-preset" onclick="setCalcAmount(500)">R$500</button>
+              <button class="calc-preset" onclick="setCalcAmount(1000)">R$1.000</button>
+              <button class="calc-preset" onclick="setCalcAmount(5000)">R$5.000</button>
+              <button class="calc-preset" onclick="setCalcAmount(10000)">R$10.000</button>
+            </div>
+          </div>
+          <div class="calc-result" id="calcResult">
+            <div class="calc-row"><span>Rota atual</span><b id="calcRoute">—</b></div>
+            <div class="calc-row"><span>Spread bruto</span><b id="calcSpread">—</b></div>
+            <div class="calc-divider"></div>
+            <div class="calc-row"><span>Taxa trade compra</span><span class="muted" id="calcFeeBuy">—</span></div>
+            <div class="calc-row"><span>Taxa trade venda</span><span class="muted" id="calcFeeSell">—</span></div>
+            <div class="calc-row"><span>Taxa transferência (BEP20)</span><span class="muted" id="calcFeeNet">—</span></div>
+            <div class="calc-row"><span>Total taxas</span><span class="red" id="calcTotalFees">—</span></div>
+            <div class="calc-divider"></div>
+            <div class="calc-row calc-final"><span>💰 Lucro líquido</span><b class="green" id="calcNet">—</b></div>
+            <div class="calc-row"><span>% lucro</span><b id="calcPct">—</b></div>
+            <div class="calc-row"><span>Lucro mensal (30 ciclos)</span><b class="green" id="calcMonthly">—</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
           <h2>📊 Preço USDT/BRL por Corretora</h2>
           <span class="muted small">ask = preço de compra · bid = preço de venda</span>
         </div>

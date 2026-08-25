@@ -226,6 +226,7 @@ async function pollDashboard() {
     fillSimSelects();
     renderBalSummary(d.balances || {});
     renderPending(d.pending_transfers || []);
+    calcProfit();
 
     if (b && b.net_usdt > 0) {
       const rb = $('robotBadge');
@@ -561,6 +562,75 @@ window.clearSettings = async function(eid) {
   msg.textContent = '✓ Removida';
   msg.style.color = 'var(--green)';
   setTimeout(() => { msg.textContent = ''; }, 3000);
+};
+
+/* ---------- CALCULATOR ---------- */
+const EX_FEES = {
+  binance: 0.001, bybit: 0.001, bitget: 0.0008, okx: 0.0008,
+  mexc: 0.0, kucoin: 0.001, mercadobitcoin: 0.005,
+};
+const NET_FEES = {
+  BEP20: {binance: 0.01, bitget: 0.15},
+  SOL: {binance: 0.30, bitget: 1.00},
+  TRC20: {binance: 1.50, bitget: 1.50},
+  ERC20: {binance: 3.50, bitget: 3.00},
+};
+const NET_TIMES = {BEP20: 3, SOL: 1, TRC20: 2, ERC20: 15};
+
+window.setCalcAmount = function(v) {
+  $('calcAmount').value = v;
+  calcProfit();
+};
+
+window.calcProfit = function() {
+  if (!DASH || !DASH.best) {
+    $('calcRoute').textContent = 'Sem oportunidade agora';
+    $('calcSpread').textContent = '—';
+    $('calcFeeBuy').textContent = '—';
+    $('calcFeeSell').textContent = '—';
+    $('calcFeeNet').textContent = '—';
+    $('calcTotalFees').textContent = '—';
+    $('calcNet').textContent = '—';
+    $('calcPct').textContent = '—';
+    $('calcMonthly').textContent = '—';
+    return;
+  }
+
+  const b = DASH.best;
+  const brl = parseFloat($('calcAmount').value) || 1000;
+  const rate = b.buy_price;
+
+  const usdt = brl / rate;
+  const feeBuyPct = EX_FEES[b.buy_exchange] || 0.001;
+  const feeSellPct = EX_FEES[b.sell_exchange] || 0.0008;
+  const feeBuy = brl * feeBuyPct;
+  const feeSell = brl * feeSellPct;
+
+  const net = b.networks.find(n => n.network === b.network) || b.networks[0];
+  const feeNetUsd = net.withdrawal_fee_usd;
+  const feeNetBrl = feeNetUsd * rate;
+
+  const totalFees = feeBuy + feeSell + feeNetBrl;
+  const grossProfit = brl * (b.gross_pct / 100);
+  const netProfit = grossProfit - totalFees;
+  const netPct = (netProfit / brl * 100);
+  const monthly = netProfit * 30;
+
+  const buyEx = b.buy_exchange;
+  const sellEx = b.sell_exchange;
+
+  $('calcRoute').innerHTML = `<span style="color:${EX_COLORS[buyEx]}">${buyEx}</span> → <span style="color:${EX_COLORS[sellEx]}">${sellEx}</span>`;
+  $('calcSpread').textContent = `R$${grossProfit.toFixed(2)} (${b.gross_pct}%)`;
+  $('calcFeeBuy').textContent = `-R$${feeBuy.toFixed(2)} (${(feeBuyPct * 100).toFixed(2)}%)`;
+  $('calcFeeSell').textContent = `-R$${feeSell.toFixed(2)} (${(feeSellPct * 100).toFixed(2)}%)`;
+  $('calcFeeNet').textContent = `-R$${feeNetBrl.toFixed(2)} ($${feeNetUsd} BEP20)`;
+  $('calcTotalFees').textContent = `-R$${totalFees.toFixed(2)}`;
+  $('calcNet').textContent = `R$${netProfit.toFixed(2)}`;
+  $('calcNet').className = netProfit >= 0 ? 'green' : 'red';
+  $('calcPct').textContent = `${netPct.toFixed(3)}%`;
+  $('calcPct').className = netPct >= 0 ? 'green' : 'red';
+  $('calcMonthly').textContent = `R$${monthly.toFixed(2)}`;
+  $('calcMonthly').className = monthly >= 0 ? 'green' : 'red';
 };
 
 /* ---------- PENDING TRANSFERS ---------- */
