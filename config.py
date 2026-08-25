@@ -51,12 +51,39 @@ PAIRS = [
 ]
 
 NETWORKS = {
-    'BEP20':    {'fee_usd': 0.15, 'minutes': 3},
+    'BEP20':    {'fee_usd': 0.30, 'minutes': 3},
     'SOL':      {'fee_usd': 0.30, 'minutes': 1},
-    'POLYGON':  {'fee_usd': 0.07, 'minutes': 3},
-    'ARBITRUM': {'fee_usd': 0.10, 'minutes': 3},
+    'POLYGON':  {'fee_usd': 0.10, 'minutes': 3},
+    'ARBITRUM': {'fee_usd': 0.15, 'minutes': 3},
     'TRC20':    {'fee_usd': 1.50, 'minutes': 2},
     'ERC20':    {'fee_usd': 3.50, 'minutes': 15},
+}
+
+WITHDRAWAL_FEES = {
+    'binance': {
+        'BEP20': 0.01, 'SOL': 0.30, 'POLYGON': 0.07,
+        'ARBITRUM': 0.10, 'TRC20': 1.50, 'ERC20': 3.50,
+    },
+    'bybit': {
+        'BEP20': 1.00, 'SOL': 1.00, 'POLYGON': 1.00,
+        'ARBITRUM': 1.00, 'TRC20': 1.60, 'ERC20': 5.00,
+    },
+    'bitget': {
+        'BEP20': 0.15, 'SOL': 1.00, 'POLYGON': 1.00,
+        'ARBITRUM': 1.00, 'TRC20': 1.50, 'ERC20': 3.00,
+    },
+    'okx': {
+        'BEP20': 0.10, 'SOL': 0.10, 'POLYGON': 0.10,
+        'ARBITRUM': 0.10, 'TRC20': 1.00, 'ERC20': 3.00,
+    },
+    'mexc': {
+        'BEP20': 0.00, 'SOL': 0.00, 'POLYGON': 0.00,
+        'ARBITRUM': 0.00, 'TRC20': 1.00, 'ERC20': 3.00,
+    },
+    'mercadobitcoin': {
+        'BEP20': 0.80, 'SOL': 0.80, 'POLYGON': 0.80,
+        'ARBITRUM': 0.80, 'TRC20': 2.00, 'ERC20': 5.00,
+    },
 }
 
 BUY_SECONDS = 2

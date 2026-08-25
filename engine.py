@@ -24,11 +24,14 @@ def simulate(pair, buy_exchange, buy_price, sell_exchange, sell_price, invest, n
     qty = invest / buy_price * (1 - fee_buy)
     gross_pct = (sell_price - buy_price) / buy_price * 100
 
+    ex_withdraw = config.WITHDRAWAL_FEES.get(buy_exchange, {})
+
     net_ids = list(config.NETWORKS) if network == 'AUTO' else [network]
     results = []
     for nid in net_ids:
         info = config.NETWORKS.get(nid, {'fee_usd': 1.0, 'minutes': 5})
-        withdraw_qty = info['fee_usd'] / sell_price
+        fee_usd = ex_withdraw.get(nid, info['fee_usd'])
+        withdraw_qty = fee_usd / sell_price
         q2 = qty - withdraw_qty
         gross = q2 * sell_price
         final = gross * (1 - fee_sell)
@@ -36,7 +39,7 @@ def simulate(pair, buy_exchange, buy_price, sell_exchange, sell_price, invest, n
         est = config.BUY_SECONDS + info['minutes'] * 60 + config.SELL_SECONDS
         results.append({
             'network': nid,
-            'withdrawal_fee_usd': info['fee_usd'],
+            'withdrawal_fee_usd': fee_usd,
             'net_usdt': round(net, 2),
             'net_pct': round(net / invest * 100, 4),
             'est_seconds': est,

@@ -569,13 +569,15 @@ const EX_FEES = {
   binance: 0.001, bybit: 0.001, bitget: 0.0008, okx: 0.0008,
   mexc: 0.0, kucoin: 0.001, mercadobitcoin: 0.005,
 };
-const NET_FEES = {
-  BEP20: {binance: 0.01, bitget: 0.15},
-  SOL: {binance: 0.30, bitget: 1.00},
-  TRC20: {binance: 1.50, bitget: 1.50},
-  ERC20: {binance: 3.50, bitget: 3.00},
+const WITHDRAWAL_FEES = {
+  binance: {BEP20: 0.01, SOL: 0.30, POLYGON: 0.07, ARBITRUM: 0.10, TRC20: 1.50, ERC20: 3.50},
+  bybit: {BEP20: 1.00, SOL: 1.00, POLYGON: 1.00, ARBITRUM: 1.00, TRC20: 1.60, ERC20: 5.00},
+  bitget: {BEP20: 0.15, SOL: 1.00, POLYGON: 1.00, ARBITRUM: 1.00, TRC20: 1.50, ERC20: 3.00},
+  okx: {BEP20: 0.10, SOL: 0.10, POLYGON: 0.10, ARBITRUM: 0.10, TRC20: 1.00, ERC20: 3.00},
+  mexc: {BEP20: 0.00, SOL: 0.00, POLYGON: 0.00, ARBITRUM: 0.00, TRC20: 1.00, ERC20: 3.00},
+  mercadobitcoin: {BEP20: 0.80, SOL: 0.80, POLYGON: 0.80, ARBITRUM: 0.80, TRC20: 2.00, ERC20: 5.00},
 };
-const NET_TIMES = {BEP20: 3, SOL: 1, TRC20: 2, ERC20: 15};
+const NET_TIMES = {BEP20: 3, SOL: 1, POLYGON: 3, ARBITRUM: 3, TRC20: 2, ERC20: 15};
 
 window.setCalcAmount = function(v) {
   $('calcAmount').value = v;
@@ -607,7 +609,7 @@ window.calcProfit = function() {
   const feeSell = brl * feeSellPct;
 
   const net = b.networks.find(n => n.network === b.network) || b.networks[0];
-  const feeNetUsd = net.withdrawal_fee_usd;
+  const feeNetUsd = (WITHDRAWAL_FEES[buyExchange] || {})[b.network] || net.withdrawal_fee_usd;
   const feeNetBrl = feeNetUsd * rate;
 
   const totalFees = feeBuy + feeSell + feeNetBrl;
