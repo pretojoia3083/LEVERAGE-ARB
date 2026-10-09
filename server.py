@@ -80,7 +80,7 @@ def startup():
                                 best['invest_usdt'], best['network'],
                             )
 
-                if executor.mode in ('real', 'demo'):
+                if executor.mode in ('real', 'demo') or executor.get_pending():
                     executor.check_deposits(scanner)
             except Exception as e:
                 print(f"[ERRO] scan: {e}")
