@@ -103,6 +103,19 @@ def home():
     return FileResponse("static/index.html")
 
 
+@app.get("/app.js")
+def serve_app_js():
+    # sem cache: garante que o navegador sempre usa o JS atual
+    return FileResponse("static/app.js", media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/style.css")
+def serve_style_css():
+    return FileResponse("static/style.css", media_type="text/css",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/api/health")
 def health():
     # endpoint leve p/ UptimeRobot manter o Render acordado 24/7
