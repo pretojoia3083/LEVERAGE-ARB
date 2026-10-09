@@ -129,6 +129,22 @@ def health():
     return {'ok': True, 'ts': time.time()}
 
 
+@app.get("/api/db-info")
+def db_info():
+    try:
+        import importlib.util
+        return {
+            'engine': 'Postgres' if db.USE_PG else 'SQLite',
+            'has_url': bool(db.DATABASE_URL),
+            'psycopg': bool(importlib.util.find_spec('psycopg')),
+            'sims_24h': db.stats(24).get('total_simulations', 0),
+            'invest_salvo': db.get_setting('invest_usdt'),
+            'spread_salvo': db.get_setting('min_spread'),
+        }
+    except Exception as e:
+        return {'erro': str(e)[:200]}
+
+
 @app.get("/api/spread")
 def get_spread():
     return {'min_spread': config.MIN_SPREAD_PCT, 'options': config.SPREAD_OPTIONS}
