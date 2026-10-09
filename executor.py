@@ -76,6 +76,40 @@ class Executor:
         return self.execute(scanner, o['pair'], o['buy_exchange'],
                             o['sell_exchange'], o['invest_usdt'], o['network'])
 
+    def run_demo_now(self, scanner):
+        """Força uma demo agora na melhor rota ao vivo (ignora o spread minimo).
+        Usado pelo botão 'Testar agora' — garante demonstração visível."""
+        snap = scanner.snapshot()
+        prices = snap.get('prices', {}) or {}
+        pairs = set()
+        for m in prices.values():
+            pairs.update(m.keys())
+        best = None
+        for pair in pairs:
+            for buy_ex, m1 in prices.items():
+                for sell_ex, m2 in prices.items():
+                    if buy_ex == sell_ex:
+                        continue
+                    b = (m1.get(pair) or {}).get('ask')
+                    s = (m2.get(pair) or {}).get('bid')
+                    if not b or not s or s <= b:
+                        continue
+                    g = (s - b) / b * 100
+                    if not best or g > best['gross_pct']:
+                        best = {'pair': pair, 'buy_exchange': buy_ex,
+                                'sell_exchange': sell_ex, 'gross_pct': g}
+        if not best:
+            return {'ok': False, 'error': 'sem preços das corretoras ainda'}
+        with self.lock:
+            if any(t.get('demo') for t in self.pending_transfers):
+                return {'ok': False, 'error': 'demo ja em andamento'}
+        o = dict(best)
+        o['invest_usdt'] = float(config.INVESTMENT_USDT)
+        o['network'] = 'AUTO'
+        o['net_pct'] = round(best['gross_pct'], 4)
+        o['net_usdt'] = 0
+        return self._execute_demo(scanner, o)
+
     def _execute_demo(self, scanner, o):
         """Demo como se fosse real: compra na hora, 'transfere' e vende sozinho
         apos DEMO_SETTLE_SECONDS, usando o preco AO VIVO da venda."""
@@ -442,6 +476,7 @@ class Executor:
                 'status': t['status'],
                 'demo': bool(t.get('demo')),
                 'seconds_left': max(0, int(t.get('settle_at', 0) - now)) if t.get('demo') else None,
+                'invest_usdt': t.get('invest_usdt', 0),
             } for t in self.pending_transfers]
 
     def _error_result(self, pair, buy_exchange, sell_exchange, invest_usdt, sim, error_msg):

@@ -582,7 +582,9 @@ async function loadDemo() {
     const box = $('demoPending');
     if (!pend.length) {
       box.className = 'muted';
-      box.textContent = 'Nenhuma operação demo agora.';
+      box.textContent = on
+        ? `Aguardando oportunidade acima de ${DASH ? DASH.min_spread : 0.10}% — ou clique em 🧪 Testar agora.`
+        : 'Nenhuma operação demo agora.';
     } else {
       box.className = '';
       box.innerHTML = pend.map(t => `
@@ -609,22 +611,44 @@ async function loadDemo() {
 
 window.toggleDemo = async function() {
   const btn = $('demoToggleBtn');
+  const sub = $('demoStateSub');
   if (btn) { btn.textContent = 'Carregando...'; btn.disabled = true; }
   try {
     const m = await api('/api/mode');
+    if (!m || !m.mode) throw new Error('sem resposta do servidor');
     if (m.mode === 'demo') {
       await api('/api/auto', { method: 'POST' }); // liga/desliga mantendo demo
     } else {
-      await api('/api/mode', {
+      const set = await api('/api/mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'demo' }),
       });
+      if (!set || set.mode !== 'demo') throw new Error('modo demo não ativou');
       const a = await api('/api/auto');
       if (!a.auto_trade) await api('/api/auto', { method: 'POST' });
     }
-  } catch (e) { /* ignora */ }
+  } catch (e) {
+    if (sub) sub.textContent = '✗ Erro: ' + (e.message || 'falhou — tente de novo');
+  }
   if (btn) btn.disabled = false;
+  await pollDashboard();
+  loadDemo();
+};
+
+window.runDemoNow = async function() {
+  const sub = $('demoStateSub');
+  if (sub) sub.textContent = '⏳ Iniciando demo...';
+  try {
+    const res = await api('/api/demo/run', { method: 'POST' });
+    if (res && res.ok) {
+      if (sub) sub.textContent = `🎬 Demo ${res.buy_exchange} → ${res.sell_exchange} — vende sozinha em ~45s`;
+    } else if (sub) {
+      sub.textContent = '✗ ' + ((res && res.error) || 'falhou');
+    }
+  } catch (e) {
+    if (sub) sub.textContent = '✗ Erro: ' + (e.message || 'falhou');
+  }
   await pollDashboard();
   loadDemo();
 };
@@ -906,6 +930,10 @@ function renderPending(pending) {
         <div class="pending-row">
           <span>Rede</span><b>${t.network}</b>
         </div>
+        ${t.live_net !== undefined && t.live_net !== null ? `
+        <div class="pending-row">
+          <span>💰 Lucro agora (ao vivo)</span><b class="${t.live_net >= 0 ? 'green' : 'red'}">${fmtBrl(t.live_net)} (${t.live_pct}%)</b>
+        </div>` : ''}
         <div class="pending-row">
           <span>Vende sozinha em</span><b class="orange">⏱ ${t.seconds_left ?? '?'}s</b>
         </div>

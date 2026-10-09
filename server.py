@@ -165,6 +165,14 @@ def get_dex():
         return {'rows': [], 'error': str(e)[:150]}
 
 
+@app.post("/api/demo/run")
+def demo_run():
+    try:
+        return executor.run_demo_now(scanner)
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:150]}
+
+
 @app.get("/api/dashboard")
 def dashboard():
     snap = scanner.snapshot()
@@ -174,6 +182,18 @@ def dashboard():
     snap['min_spread'] = config.MIN_SPREAD_PCT
     snap['spread_options'] = config.SPREAD_OPTIONS
     snap['pending_transfers'] = executor.get_pending()
+    # lucro AO VIVO de cada operação aberta (como se vendesse agora pelo preço atual)
+    for t in snap['pending_transfers']:
+        try:
+            live_bid = (snap['prices'].get(t['to'], {}).get(t['pair']) or {}).get('bid')
+            inv = float(t.get('invest_usdt') or 0)
+            if live_bid and inv:
+                live_net = round(float(t['qty']) * float(live_bid) - inv, 2)
+                t['live_net'] = live_net
+                t['live_pct'] = round(live_net / inv * 100, 4)
+                t['live_price'] = live_bid
+        except Exception:
+            pass
     stats = db.stats()
     snap['total_simulations'] = stats.get('total_simulations', 0)
     snap['total_executions'] = stats.get('total_executions', 0)
