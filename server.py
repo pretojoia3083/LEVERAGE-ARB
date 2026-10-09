@@ -27,8 +27,8 @@ LAST_OPPS = []
 @app.on_event("startup")
 def startup():
     def bootstrap():
-        global LAST_OPPS
-        # valor e spread salvos continuam valendo após reiniciar/atualizar
+        global LAST_OPPS, AUTO_TRADE
+        # valor, spread, modo e auto salvos continuam valendo após reiniciar/atualizar
         try:
             inv = db.get_setting('invest_usdt')
             if inv and float(inv) >= 10:
@@ -36,7 +36,14 @@ def startup():
             spr = db.get_setting('min_spread')
             if spr is not None and 0 <= float(spr) <= 5:
                 config.MIN_SPREAD_PCT = float(spr)
-            print(f"[LEVERAGE ARB] config salva: invest R${config.INVESTMENT_USDT} · spread {config.MIN_SPREAD_PCT}%")
+            md = db.get_setting('mode')
+            if md in ('paper', 'demo', 'real'):
+                executor.set_mode(md)
+            at = db.get_setting('auto_trade')
+            AUTO_TRADE = (at == '1')
+            print(f"[LEVERAGE ARB] config salva: invest R${config.INVESTMENT_USDT} · spread {config.MIN_SPREAD_PCT}% · modo {executor.mode} · auto {'ON' if AUTO_TRADE else 'OFF'}")
+            if executor.mode == 'real' and AUTO_TRADE:
+                print("[LEVERAGE ARB] ⚠️ modo REAL com auto ON restaurado — confira operações em aberto")
         except Exception as e:
             print(f"[LEVERAGE ARB] config padrao ({e})")
         n = scanner.load_exchanges()
@@ -223,6 +230,10 @@ def get_auto():
 def set_auto():
     global AUTO_TRADE
     AUTO_TRADE = not AUTO_TRADE
+    try:
+        db.set_setting('auto_trade', '1' if AUTO_TRADE else '0')
+    except Exception:
+        pass
     print(f"[AUTO] {'LIGADO' if AUTO_TRADE else 'DESLIGADO'}")
     return {'auto_trade': AUTO_TRADE, 'mode': executor.mode}
 
@@ -245,6 +256,10 @@ def set_mode(req: ModeRequest | None = None):
     else:
         new_mode = order[(order.index(cur) + 1) % len(order)]
     executor.set_mode(new_mode)
+    try:
+        db.set_setting('mode', new_mode)
+    except Exception:
+        pass
     print(f"[MODE] Alterado para: {new_mode}")
     return {'mode': new_mode}
 
