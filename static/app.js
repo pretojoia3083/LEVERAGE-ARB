@@ -106,8 +106,10 @@ document.querySelectorAll('.menu-item').forEach(btn => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     $(`tab-${btn.dataset.tab}`).classList.add('active');
-    if (btn.dataset.tab === 'historico') loadHistory();
-    if (btn.dataset.tab === 'configuracao') { loadSettings(); loadBalances(); }
+    if (btn.dataset.tab === 'analytics') loadHistory();
+    if (btn.dataset.tab === 'saldo') loadBalances();
+    if (btn.dataset.tab === 'oportunidades') loadDex();
+    if (btn.dataset.tab === 'configuracao') { loadSettings(); }
   });
 });
 
@@ -177,17 +179,20 @@ function renderPrices(prices, opps, exchangesOk) {
     const isMB = ex === 'mercadobitcoin';
 
     if (!pair || !pair.ask) {
+      const noPair = !isConnected && /gate|kucoin|kraken/i.test(ex);
       return `<div class="price-card${isConnected ? '' : ' offline'}">
         <div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div>
-        <div class="price-ask muted">${isConnected ? 'aguardando...' : 'offline'}</div>
+        <div class="price-ask muted">${noPair ? 'sem par BRL' : (isConnected ? 'aguardando...' : 'offline')}</div>
       </div>`;
     }
     const spread = pair.ask && pair.bid ? (((pair.ask - pair.bid) / pair.bid) * 100).toFixed(3) : '—';
+    const vol = pair.volume ? `<div class="price-vol">vol 24h $${Number(pair.volume).toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>` : '';
     return `<div class="price-card${isActive ? ' active' : ''}">
       <div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div>
       <div class="price-ask">ask ${fmtPrice(pair.ask)}</div>
       <div class="price-bid">bid ${fmtPrice(pair.bid)}</div>
       <div class="price-spread">spread ${spread}%</div>
+      ${vol}
       ${isActive ? '<div class="price-tag">OPORTUNIDADE</div>' : ''}
     </div>`;
   }).join('');
@@ -223,10 +228,20 @@ async function pollDashboard() {
     renderBest(b);
     renderOpps(d.opportunities || []);
     renderPrices(d.prices, d.opportunities || [], d.exchanges_ok || []);
+    renderSpreadPills(d.min_spread, d.spread_options);
     fillSimSelects();
     renderBalSummary(d.balances || {});
     renderPending(d.pending_transfers || []);
     calcProfit();
+
+    if ($('investInput') && d.investment && document.activeElement !== $('investInput')) {
+      $('investInput').value = d.investment;
+    }
+    if ($('cotUpdated') && d.last_scan) {
+      $('cotUpdated').textContent = `atualizado ${new Date(d.last_scan).toLocaleTimeString('pt-BR')} · ${(d.exchanges_ok || []).length} corretoras`;
+    }
+    const foot = $('footEx');
+    if (foot) foot.textContent = `${(d.exchanges_ok || []).length} corretoras · USDT/BRL`;
 
     if (b && b.net_usdt > 0) {
       const rb = $('robotBadge');
@@ -279,7 +294,7 @@ function fillSimSelects() {
 }
 
 window.fillSim = function (pair, buyEx, sellEx) {
-  document.querySelector('[data-tab="simulador"]').click();
+  document.querySelector('[data-tab="oportunidades"]').click();
   fillSimSelects();
   setTimeout(() => {
     $('simPair').value = pair;
@@ -435,8 +450,81 @@ $('btnClear').addEventListener('click', async () => {
 pollDashboard();
 setInterval(pollDashboard, 5000);
 setInterval(() => {
-  if ($('tab-historico').classList.contains('active')) loadHistory();
+  if ($('tab-analytics').classList.contains('active')) loadHistory();
 }, 8000);
+setInterval(() => {
+  if ($('tab-oportunidades').classList.contains('active')) loadDex();
+}, 30000);
+
+/* ---------- SPREAD MINIMO ---------- */
+function renderSpreadPills(current, options) {
+  const box = $('spreadPills');
+  if (!box) return;
+  const opts = options && options.length ? options : [0.10, 0.50, 1.0, 2.0];
+  box.innerHTML = opts.map(v => `
+    <button class="spread-pill${Number(current) === Number(v) ? ' active' : ''}"
+      onclick="setSpread(${v})">${Number(v).toFixed(2)}%</button>`).join('');
+}
+
+window.setSpread = async function(v) {
+  const res = await api('/api/spread', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ min_spread: v }),
+  });
+  if (res.ok) {
+    renderSpreadPills(res.min_spread, (DASH && DASH.spread_options) || [0.10, 0.50, 1.0, 2.0]);
+    if (DASH) DASH.min_spread = res.min_spread;
+    pollDashboard();
+  }
+};
+
+/* ---------- INVESTIMENTO ---------- */
+window.saveInvestment = async function() {
+  const v = parseFloat($('investInput').value) || 0;
+  const msg = $('investMsg');
+  const res = await api('/api/investment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invest_usdt: v }),
+  });
+  if (msg) {
+    msg.textContent = res.ok ? '✓ Salvo!' : ('✗ ' + (res.error || 'erro'));
+    msg.style.color = res.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  }
+};
+
+/* ---------- DEX KYBERSWAP ---------- */
+async function loadDex() {
+  const body = $('dexBody');
+  if (!body) return;
+  try {
+    const d = await api('/api/dex');
+    const rows = d.rows || [];
+    if (!rows.length) {
+      body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px" class="muted">Buscando cotações DEX...</td></tr>`;
+      return;
+    }
+    body.innerHTML = rows.map(r => {
+      if (!r.ok) return `<tr><td><b>${r.chain}</b></td><td colspan="4" class="muted">indisponível agora</td></tr>`;
+      const pnlCls = r.roundtrip_pnl >= 0 ? 'green' : 'red';
+      return `<tr>
+        <td><b>${r.chain}</b></td>
+        <td>${Number(r.brz_out).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} BRZ</td>
+        <td>$${r.brz_price_usdt}</td>
+        <td>$${r.roundtrip_usdt}</td>
+        <td class="right"><b class="${pnlCls}">${r.roundtrip_pnl >= 0 ? '+' : ''}$${r.roundtrip_pnl}</b></td>
+      </tr>`;
+    }).join('');
+    const upd = $('dexUpdated');
+    if (upd) upd.textContent = d.updated_ts
+      ? 'atualizado ' + new Date(d.updated_ts * 1000).toLocaleTimeString('pt-BR')
+      : '';
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px" class="muted">DEX offline no momento</td></tr>`;
+  }
+}
 
 /* ---------- CONFIGURACAO ---------- */
 const EX_LABELS = {
@@ -566,14 +654,14 @@ window.clearSettings = async function(eid) {
 
 /* ---------- CALCULATOR ---------- */
 var EX_FEES = {
-  binance: 0.001, bybit: 0.001, bitget: 0.0008, okx: 0.0008,
-  mexc: 0.0, kucoin: 0.001, mercadobitcoin: 0.005,
+  binance: 0.001, bybit: 0.001, bitget: 0.001, okx: 0.001,
+  mexc: 0.0005, kucoin: 0.001, mercadobitcoin: 0.005,
 };
 var WD_FEES = {
-  binance: {BEP20: 0.29, SOL: 1.00, POLYGON: 1.00, ARBITRUM: 0.10, TRC20: 1.00, ERC20: 3.50},
-  bybit: {BEP20: 1.00, SOL: 1.00, POLYGON: 1.00, ARBITRUM: 1.00, TRC20: 1.60, ERC20: 5.00},
-  bitget: {BEP20: 0.15, SOL: 1.00, POLYGON: 1.00, ARBITRUM: 1.00, TRC20: 1.50, ERC20: 2.00},
-  okx: {BEP20: 0.80, SOL: 0.10, POLYGON: 0.30, ARBITRUM: 0.50, TRC20: 1.00, ERC20: 3.00},
+  binance: {BEP20: 0.01, SOL: 0.30, POLYGON: 0.07, ARBITRUM: 0.10, TRC20: 1.50, ERC20: 0.40},
+  bybit: {BEP20: 1.00, SOL: 1.00, POLYGON: 0.07, ARBITRUM: 1.00, TRC20: 1.60, ERC20: 5.00},
+  bitget: {BEP20: 0.15, SOL: 1.00, POLYGON: 0.07, ARBITRUM: 0.05, TRC20: 1.50, ERC20: 2.00},
+  okx: {BEP20: 0.05, SOL: 0.34, POLYGON: 0.012, ARBITRUM: 0.0034, TRC20: 1.00, ERC20: 0.43},
   mexc: {BEP20: 0.01, SOL: 0.18, POLYGON: 0.0065, ARBITRUM: 0.05, TRC20: 1.00, ERC20: 0.094},
   mercadobitcoin: {BEP20: 1.50, SOL: 2.00, POLYGON: 2.00, ARBITRUM: 2.00, TRC20: 3.00, ERC20: 10.00},
 };

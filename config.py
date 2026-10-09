@@ -20,6 +20,13 @@ AUTO_SIM_COOLDOWN = 60
 SCAN_INTERVAL = 5
 TOP_LIMIT = 50
 
+# Spread minimo exibido nas oportunidades (escolhido no menu: 0.10 / 0.50 / 1.0 / 2.0)
+SPREAD_OPTIONS = [0.10, 0.50, 1.0, 2.0]
+MIN_SPREAD_PCT = float(os.environ.get('MIN_SPREAD_PCT', '0.10'))
+
+# Redes preferidas (BEP20 + Polygon primeiro, resto como reserva)
+NETWORK_PRIORITY = ['BEP20', 'POLYGON', 'ARBITRUM', 'SOL', 'TRC20', 'ERC20']
+
 IS_CLOUD = os.environ.get('RENDER') is not None
 
 EXCHANGES = [
@@ -35,11 +42,11 @@ EXCHANGES = [
 TAKER_FEES = {
     'binance': 0.0010,
     'bybit':   0.0010,
-    'bitget':  0.0008,
+    'bitget':  0.0010,
     'kucoin':  0.0010,
-    'okx':     0.0008,
+    'okx':     0.0010,
     'gate':    0.0009,
-    'mexc':    0.0000,
+    'mexc':    0.0005,
     'htx':     0.0020,
     'kraken':  0.0026,
     'mercadobitcoin': 0.0050,
@@ -61,20 +68,20 @@ NETWORKS = {
 
 WITHDRAWAL_FEES = {
     'binance': {
-        'BEP20': 0.29, 'SOL': 1.00, 'POLYGON': 1.00,
-        'ARBITRUM': 0.10, 'TRC20': 1.00, 'ERC20': 3.50,
+        'BEP20': 0.01, 'SOL': 0.30, 'POLYGON': 0.07,
+        'ARBITRUM': 0.10, 'TRC20': 1.50, 'ERC20': 0.40,
     },
     'bybit': {
-        'BEP20': 1.00, 'SOL': 1.00, 'POLYGON': 1.00,
+        'BEP20': 1.00, 'SOL': 1.00, 'POLYGON': 0.07,
         'ARBITRUM': 1.00, 'TRC20': 1.60, 'ERC20': 5.00,
     },
     'bitget': {
-        'BEP20': 0.15, 'SOL': 1.00, 'POLYGON': 1.00,
-        'ARBITRUM': 1.00, 'TRC20': 1.50, 'ERC20': 2.00,
+        'BEP20': 0.15, 'SOL': 1.00, 'POLYGON': 0.07,
+        'ARBITRUM': 0.05, 'TRC20': 1.50, 'ERC20': 2.00,
     },
     'okx': {
-        'BEP20': 0.80, 'SOL': 0.10, 'POLYGON': 0.30,
-        'ARBITRUM': 0.50, 'TRC20': 1.00, 'ERC20': 3.00,
+        'BEP20': 0.05, 'SOL': 0.34, 'POLYGON': 0.012,
+        'ARBITRUM': 0.0034, 'TRC20': 1.00, 'ERC20': 0.43,
     },
     'mexc': {
         'BEP20': 0.01, 'SOL': 0.18, 'POLYGON': 0.0065,

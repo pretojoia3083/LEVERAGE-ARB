@@ -39,9 +39,12 @@
 
     <div class="menu">
       <div class="menu-label">Menu</div>
-      <button class="menu-item active" data-tab="scanner"><span>⚡</span> Scanner</button>
-      <button class="menu-item" data-tab="simulador"><span>🧪</span> Simulador</button>
-      <button class="menu-item" data-tab="historico"><span>📜</span> Histórico</button>
+      <button class="menu-item active" data-tab="cotacoes"><span>💹</span> Cotações</button>
+      <button class="menu-item" data-tab="monitor"><span>🖥️</span> Monitor</button>
+      <button class="menu-item" data-tab="saldo"><span>💰</span> Saldo</button>
+      <button class="menu-item" data-tab="oportunidades"><span>⚡</span> Oportunidades</button>
+      <button class="menu-item" data-tab="bot"><span>🤖</span> LeverageBot</button>
+      <button class="menu-item" data-tab="analytics"><span>📊</span> Analytics</button>
       <button class="menu-item" data-tab="configuracao"><span>⚙️</span> Configuração</button>
     </div>
 
@@ -52,28 +55,35 @@
       <div class="live-badge" id="robotBadge" style="display:none;background:#FF6B00;color:#000;margin-top:6px">
         🤖 Operando...
       </div>
-      <div class="foot-info">Scanner multi-exchange<br>6 corretoras · USDT/BRL</div>
+      <div class="foot-info">Scanner multi-exchange<br><span id="footEx">USDT/BRL</span></div>
     </div>
   </nav>
 
   <main class="content">
 
-    <!-- SCANNER -->
-    <section id="tab-scanner" class="tab active">
+    <!-- COTAÇÕES -->
+    <section id="tab-cotacoes" class="tab active">
       <div class="page-head">
         <div>
-          <h1 class="font-display">⚡ Arbitragem Cripto</h1>
-          <p class="muted">Compre barato em uma corretora, venda caro em outra — com detecção automática da rede mais barata</p>
+          <h1 class="font-display">💹 Cotações</h1>
+          <p class="muted">Preço USDT/BRL ao vivo em cada corretora — ask = preço de compra · bid = preço de venda</p>
         </div>
-        <div class="controls-wrap">
-          <div class="mode-toggle-wrap" id="modeWrap">
-            <span class="muted small" id="modeLabel">Modo: Paper</span>
-            <button class="toggle-btn" id="modeBtn" onclick="toggleMode()">📝 Paper</button>
-          </div>
-          <div class="auto-toggle-wrap" id="autoWrap">
-            <span class="muted small" id="autoLabel">Auto: OFF</span>
-            <button class="toggle-btn" id="autoBtn" onclick="toggleAuto()">✋ Manual</button>
-          </div>
+      </div>
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>📊 Preço USDT/BRL por Corretora</h2>
+          <span class="muted small" id="cotUpdated"></span>
+        </div>
+        <div class="prices-grid" id="pricesGrid"></div>
+      </div>
+    </section>
+
+    <!-- MONITOR -->
+    <section id="tab-monitor" class="tab">
+      <div class="page-head">
+        <div>
+          <h1 class="font-display">🖥️ Monitor</h1>
+          <p class="muted">Scanner rodando 24/7 — oportunidades detectadas em tempo real</p>
         </div>
       </div>
 
@@ -100,12 +110,83 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-head">
+          <h2>🏆 Melhor oportunidade agora</h2>
+          <span class="muted small">auto-atualiza a cada 5s · rede mais barata detectada automaticamente</span>
+        </div>
+        <div id="bestPanel" class="best-empty muted">Nenhuma oportunidade no momento. O scanner monitora as corretoras × USDT/BRL continuamente...</div>
+      </div>
+
+      <div id="pendingSection" class="card" style="display:none;border-color:rgba(255,107,0,.5)">
+        <div class="card-head">
+          <h2>⏳ Transferência Pendente</h2>
+          <span class="badge badge-orange">Aguardando</span>
+        </div>
+        <div id="pendingBody" class="p5"></div>
+      </div>
+    </section>
+
+    <!-- SALDO -->
+    <section id="tab-saldo" class="tab">
+      <div class="page-head">
+        <div>
+          <h1 class="font-display">💰 Saldo</h1>
+          <p class="muted">Seu dinheiro em cada corretora (precisa de API key configurada)</p>
+        </div>
+        <button class="btn-save" onclick="loadBalances()">🔄 Atualizar saldos</button>
+      </div>
+
       <div class="card p5" id="balSummaryCard" style="display:none">
         <div class="card-head noborder">
-          <h2>💰 Saldos nas Corretoras</h2>
-          <button class="btn-save" onclick="loadBalances()" style="font-size:12px;padding:6px 12px">🔄 Atualizar</button>
+          <h2>💰 Resumo rápido</h2>
         </div>
         <div id="balSummary" class="balances-grid"></div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>💰 Saldos nas Corretoras</h2>
+          <span class="muted small" id="balanceHint">Configure API keys pra ver saldos</span>
+        </div>
+        <div id="balancesGrid" class="balances-grid"></div>
+      </div>
+    </section>
+
+    <!-- OPORTUNIDADES -->
+    <section id="tab-oportunidades" class="tab">
+      <div class="page-head">
+        <div>
+          <h1 class="font-display">⚡ Oportunidades</h1>
+          <p class="muted">Compre barato em uma corretora, venda caro em outra</p>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>🎯 Spread mínimo</h2>
+          <span class="muted small">só mostra lucros acima do valor escolhido</span>
+        </div>
+        <div class="spread-pills" id="spreadPills"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>💹 Todas as oportunidades ao vivo</h2>
+          <span class="muted small" id="oppCount"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Ativo</th><th>Comprar</th><th>Vender</th>
+                <th>Spread bruto</th><th>Melhor rede</th><th>Taxas totais</th>
+                <th>Tempo estimado</th><th class="right">Lucro líquido</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="oppsBody"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card p5">
@@ -132,7 +213,7 @@
             <div class="calc-divider"></div>
             <div class="calc-row"><span>Taxa trade compra</span><span class="muted" id="calcFeeBuy">—</span></div>
             <div class="calc-row"><span>Taxa trade venda</span><span class="muted" id="calcFeeSell">—</span></div>
-            <div class="calc-row"><span>Taxa transferência (BEP20)</span><span class="muted" id="calcFeeNet">—</span></div>
+            <div class="calc-row"><span>Taxa transferência</span><span class="muted" id="calcFeeNet">—</span></div>
             <div class="calc-row"><span>Total taxas</span><span class="red" id="calcTotalFees">—</span></div>
             <div class="calc-divider"></div>
             <div class="calc-row calc-final"><span>💰 Lucro líquido</span><b class="green" id="calcNet">—</b></div>
@@ -144,90 +225,114 @@
 
       <div class="card p5">
         <div class="card-head noborder">
-          <h2>📊 Preço USDT/BRL por Corretora</h2>
-          <span class="muted small">ask = preço de compra · bid = preço de venda</span>
+          <h2>🧪 Simulador</h2>
+          <span class="muted small">Simule qualquer rota com preços reais do scanner</span>
         </div>
-        <div class="prices-grid" id="pricesGrid"></div>
+        <div class="sim-grid">
+          <div class="card p5">
+            <label class="label">Ativo</label>
+            <select id="simPair" class="input"></select>
+
+            <label class="label mt16">Corretora de compra (ask)</label>
+            <select id="simBuy" class="input"></select>
+
+            <label class="label mt16">Corretora de venda (bid)</label>
+            <select id="simSell" class="input"></select>
+
+            <label class="label mt16">Valor investido (USDT)</label>
+            <input type="number" id="simInvest" class="input" value="1000" min="10" step="50">
+
+            <label class="label mt16">Rede de saque</label>
+            <select id="simNetwork" class="input">
+              <option value="AUTO">🤖 Auto — BEP20/Polygon primeiro</option>
+              <option value="BEP20">BEP20 (barata · ~3min)</option>
+              <option value="POLYGON">Polygon (mais barata · ~3min)</option>
+              <option value="ARBITRUM">Arbitrum (~3min)</option>
+              <option value="SOL">Solana (~1min)</option>
+              <option value="TRC20">TRC20 (~2min)</option>
+              <option value="ERC20">ERC20 (cara · ~15min)</option>
+            </select>
+
+            <button class="btn-primary w100 mt20" id="simRun">🚀 Rodar simulação</button>
+          </div>
+
+          <div class="card p5">
+            <div class="card-head noborder"><h2>Resultado</h2></div>
+            <div id="simResult" class="muted">Escolha uma rota e clique em "Rodar simulação" — ou clique em 🧪 numa linha de oportunidade.</div>
+          </div>
+        </div>
       </div>
 
-      <div class="card">
-        <div class="card-head">
-          <h2>🏆 Melhor oportunidade agora</h2>
-          <span class="muted small">auto-atualiza a cada 5s · rede mais barata detectada automaticamente</span>
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>🔀 DEX KyberSwap <span class="muted small">monitor (sem carteira)</span></h2>
+          <span class="muted small" id="dexUpdated"></span>
         </div>
-        <div id="bestPanel" class="best-empty muted">Nenhuma oportunidade no momento. O scanner monitora 8 corretoras × USDT/BRL continuamente...</div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h2>💹 Todas as oportunidades ao vivo</h2>
-          <span class="muted small" id="oppCount"></span>
-        </div>
+        <p class="muted small">Quanto 1.000 USDT compram de BRZ (1 BRZ ≈ R$1) em cada rede — compare com o preço do CEX.</p>
         <div class="table-wrap">
           <table class="tbl">
             <thead>
-              <tr>
-                <th>Ativo</th><th>Comprar</th><th>Vender</th>
-                <th>Spread bruto</th><th>Melhor rede</th><th>Taxas totais</th>
-                <th>Tempo estimado</th><th class="right">Lucro líquido</th><th></th>
-              </tr>
+              <tr><th>Rede</th><th>1.000 USDT → BRZ</th><th>Preço 1 BRZ (USDT)</th><th>Volta p/ USDT</th><th class="right">Ida+volta</th></tr>
             </thead>
-            <tbody id="oppsBody"></tbody>
+            <tbody id="dexBody"></tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <!-- SIMULADOR -->
-    <section id="tab-simulador" class="tab">
+    <!-- LEVERAGEBOT -->
+    <section id="tab-bot" class="tab">
       <div class="page-head">
         <div>
-          <h1 class="font-display">🧪 Simulador</h1>
-          <p class="muted">Simule qualquer rota com preços reais do scanner — comparativo de todas as redes</p>
+          <h1 class="font-display">🤖 LeverageBot</h1>
+          <p class="muted">Robô que opera sozinho as oportunidades — paper ou real</p>
         </div>
       </div>
 
-      <div class="sim-grid">
+      <div class="grid-3">
         <div class="card p5">
-          <label class="label">Ativo</label>
-          <select id="simPair" class="input"></select>
-
-          <label class="label mt16">Corretora de compra (ask)</label>
-          <select id="simBuy" class="input"></select>
-
-          <label class="label mt16">Corretora de venda (bid)</label>
-          <select id="simSell" class="input"></select>
-
-          <label class="label mt16">Valor investido (USDT)</label>
-          <input type="number" id="simInvest" class="input" value="1000" min="10" step="50">
-
-          <label class="label mt16">Rede de saque</label>
-          <select id="simNetwork" class="input">
-            <option value="AUTO">🤖 Auto — detecta a mais barata</option>
-            <option value="BEP20">BEP20 ($0.30 · ~3min)</option>
-            <option value="POLYGON">Polygon ($0.10 · ~3min)</option>
-            <option value="ARBITRUM">Arbitrum ($0.15 · ~3min)</option>
-            <option value="SOL">Solana ($0.05 · ~1min)</option>
-            <option value="TRC20">TRC20 ($1.00 · ~2min)</option>
-            <option value="ERC20">ERC20 ($4.00 · ~15min)</option>
-          </select>
-
-          <button class="btn-primary w100 mt20" id="simRun">🚀 Rodar simulação</button>
+          <div class="card-label">Modo de operação</div>
+          <div class="mode-toggle-wrap" id="modeWrap" style="margin:10px 0">
+            <span class="muted small" id="modeLabel">Modo: Paper</span><br><br>
+            <button class="toggle-btn" id="modeBtn" onclick="toggleMode()">📝 Paper</button>
+          </div>
+          <div class="card-sub muted">Paper = simula com preço real · Real = opera de verdade</div>
         </div>
-
         <div class="card p5">
-          <div class="card-head noborder"><h2>Resultado</h2></div>
-          <div id="simResult" class="muted">Escolha uma rota e clique em "Rodar simulação" — ou clique em 🧪 numa linha do Scanner.</div>
+          <div class="card-label">Robô automático</div>
+          <div class="auto-toggle-wrap" id="autoWrap" style="margin:10px 0">
+            <span class="muted small" id="autoLabel">Auto: OFF</span><br><br>
+            <button class="toggle-btn" id="autoBtn" onclick="toggleAuto()">✋ Manual</button>
+          </div>
+          <div class="card-sub muted">Ligado = executa sozinho acima do spread mínimo</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">Valor por operação (USDT)</div>
+          <input type="number" id="investInput" class="input" value="50" min="10" step="10" style="margin:10px 0">
+          <button class="btn-save" onclick="saveInvestment()">💾 Salvar valor</button>
+          <span class="muted small" id="investMsg" style="margin-left:8px"></span>
+          <div class="card-sub muted">Várias operações pequenas compõem o capital</div>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <h2>Como funciona</h2>
+        <div class="muted" style="line-height:1.9;font-size:14px">
+          1️⃣ O scanner lê o preço do USDT em todas as corretoras a cada 5 segundos.<br>
+          2️⃣ Quando acha lucro acima do <b>spread mínimo</b>, registra a simulação sozinho.<br>
+          3️⃣ Com o <b>robô ligado</b>, ele executa a melhor rota automaticamente.<br>
+          4️⃣ No modo <b>Real</b>, ele compra na corretora barata e te guia na transferência — a venda acontece sozinha quando o saldo chega.<br>
+          ⚠️ Para rodar 24h sem parar, deixe o servidor no ar (Render + UptimeRobot pingando <b>/api/health</b> a cada 5 min).
         </div>
       </div>
     </section>
 
-    <!-- HISTORICO -->
-    <section id="tab-historico" class="tab">
+    <!-- ANALYTICS -->
+    <section id="tab-analytics" class="tab">
       <div class="page-head">
         <div>
-          <h1 class="font-display">📜 Histórico</h1>
-          <p class="muted">Operações simuladas pelo sistema com oportunidades reais</p>
+          <h1 class="font-display">📊 Analytics</h1>
+          <p class="muted">Resultado acumulado das operações</p>
         </div>
         <button class="btn-danger" id="btnClear">Limpar histórico</button>
       </div>
@@ -317,26 +422,9 @@
         </div>
         <div id="settingsStatus" class="settings-status"></div>
       </div>
-
-      <div class="card p5">
-        <div class="card-head noborder">
-          <h2>💰 Saldos nas Corretoras</h2>
-          <span class="muted small" id="balanceHint">Configure API keys pra ver saldos</span>
-          <button class="btn-save" onclick="loadBalances()" style="margin-left:auto">🔄 Atualizar</button>
-        </div>
-        <div id="balancesGrid" class="balances-grid"></div>
-      </div>
     </section>
 
-      <div id="pendingSection" class="card" style="display:none;border-color:rgba(255,107,0,.5)">
-        <div class="card-head">
-          <h2>⏳ Transferência Pendente</h2>
-          <span class="badge badge-orange">Aguardando</span>
-        </div>
-        <div id="pendingBody" class="p5"></div>
-      </div>
-
-      <div id="execToast" class="exec-toast"></div>
+    <div id="execToast" class="exec-toast"></div>
 
   </main>
 </div>

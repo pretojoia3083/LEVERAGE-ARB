@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 import config
 import db
+import dex
 from engine import Scanner, simulate
 from executor import executor
 
@@ -85,12 +86,68 @@ def home():
     return FileResponse("static/index.html")
 
 
+@app.get("/api/health")
+def health():
+    # endpoint leve p/ UptimeRobot manter o Render acordado 24/7
+    return {'ok': True, 'ts': time.time()}
+
+
+@app.get("/api/spread")
+def get_spread():
+    return {'min_spread': config.MIN_SPREAD_PCT, 'options': config.SPREAD_OPTIONS}
+
+
+class SpreadRequest(BaseModel):
+    min_spread: float
+
+
+@app.post("/api/spread")
+def set_spread(req: SpreadRequest):
+    v = float(req.min_spread)
+    if v not in config.SPREAD_OPTIONS and v not in [float(x) for x in config.SPREAD_OPTIONS]:
+        # aceita qualquer valor entre 0 e 5 mesmo fora dos presets
+        if not (0 <= v <= 5):
+            return {'error': 'spread invalido'}
+    config.MIN_SPREAD_PCT = v
+    print(f"[SPREAD] minimo agora: {v}%")
+    return {'ok': True, 'min_spread': v}
+
+
+@app.get("/api/investment")
+def get_investment():
+    return {'invest_usdt': config.INVESTMENT_USDT}
+
+
+class InvestmentRequest(BaseModel):
+    invest_usdt: float
+
+
+@app.post("/api/investment")
+def set_investment(req: InvestmentRequest):
+    v = float(req.invest_usdt)
+    if v < 10 or v > 1000000:
+        return {'error': 'valor invalido (10 a 1000000)'}
+    config.INVESTMENT_USDT = v
+    print(f"[INVEST] agora: {v} USDT")
+    return {'ok': True, 'invest_usdt': v}
+
+
+@app.get("/api/dex")
+def get_dex():
+    try:
+        return dex.snapshot()
+    except Exception as e:
+        return {'rows': [], 'error': str(e)[:150]}
+
+
 @app.get("/api/dashboard")
 def dashboard():
     snap = scanner.snapshot()
     snap['investment'] = config.INVESTMENT_USDT
     snap['auto_trade'] = AUTO_TRADE
     snap['mode'] = executor.mode
+    snap['min_spread'] = config.MIN_SPREAD_PCT
+    snap['spread_options'] = config.SPREAD_OPTIONS
     snap['pending_transfers'] = executor.get_pending()
     stats = db.stats()
     snap['total_simulations'] = stats.get('total_simulations', 0)

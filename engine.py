@@ -48,6 +48,22 @@ def simulate(pair, buy_exchange, buy_price, sell_exchange, sell_price, invest, n
     results.sort(key=lambda r: r['net_usdt'], reverse=True)
     chosen = results[0]
 
+    # Preferencia BEP20/Polygon: se uma rede prioritaria ficar proxima da melhor
+    # (diferenca menor que $0.10 ou 0.01%), usa a prioritaria (mais barata/rapida)
+    try:
+        prio = getattr(config, 'NETWORK_PRIORITY', [])
+        if prio:
+            order = {nid: i for i, nid in enumerate(prio)}
+            best_net = chosen['net_usdt']
+            cands = [r for r in results
+                     if order.get(r['network'], 99) < order.get(chosen['network'], 99)
+                     and (best_net - r['net_usdt']) <= max(0.10, invest * 0.0001)]
+            if cands:
+                cands.sort(key=lambda r: order.get(r['network'], 99))
+                chosen = cands[0]
+    except Exception:
+        pass
+
     return {
         'asset': asset,
         'invest_usdt': invest,
@@ -235,6 +251,19 @@ class Scanner:
         pair = 'USDT/BRL'
         try:
             if eid == 'binance':
+                # Espelho publico oficial (contorna bloqueio 451 em IP de datacenter)
+                import requests as _req
+                try:
+                    r = _req.get('https://data-api.binance.vision/api/v3/ticker/24hr',
+                                 params={'symbol': 'USDTBRL'}, timeout=10)
+                    d = r.json()
+                    bid = float(d.get('bidPrice', 0))
+                    ask = float(d.get('askPrice', 0))
+                    if ask > 0 and bid > 0:
+                        return {pair: {'ask': ask, 'bid': bid,
+                                       'volume': float(d.get('quoteVolume', 0) or 0)}}
+                except Exception:
+                    pass
                 d = ex.publicGetTickerPrice({'symbol': 'USDTBRL'})
                 price = float(d.get('price', 0))
                 if price > 0:
@@ -312,7 +341,12 @@ class Scanner:
                 try:
                     t = ex.fetch_ticker(pair)
                     if t and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
-                        m[pair] = {'ask': t['ask'], 'bid': t['bid']}
+                        vol = t.get('quoteVolume') or t.get('baseVolume') or 0
+                        try:
+                            vol = float(vol or 0)
+                        except Exception:
+                            vol = 0
+                        m[pair] = {'ask': t['ask'], 'bid': t['bid'], 'volume': vol}
                 except Exception:
                     pass
             if not m:
@@ -354,22 +388,33 @@ class Scanner:
             prices['mercadobitcoin'] = mb
 
         opps = []
+        min_spread = getattr(config, 'MIN_SPREAD_PCT', 0.10)
+        try:
+            min_spread = float(min_spread)
+        except Exception:
+            min_spread = 0.10
         for pair in config.PAIRS:
-            asks = [(eid, m[pair]['ask']) for eid, m in prices.items() if pair in m]
-            bids = [(eid, m[pair]['bid']) for eid, m in prices.items() if pair in m]
-            if len(asks) < 2 or len(bids) < 2:
+            exs = [eid for eid, m in prices.items() if pair in m]
+            if len(exs) < 2:
                 continue
-            buy_ex, ask = min(asks, key=lambda x: x[1])
-            sell_ex, bid = max(bids, key=lambda x: x[1])
-            if buy_ex == sell_ex:
-                continue
-            sim = simulate(pair, buy_ex, ask, sell_ex, bid, config.INVESTMENT_USDT, 'AUTO')
-            sim['pair'] = pair
-            sim['buy_exchange'] = buy_ex
-            sim['sell_exchange'] = sell_ex
-            opps.append(sim)
+            for buy_ex in exs:
+                for sell_ex in exs:
+                    if buy_ex == sell_ex:
+                        continue
+                    ask = prices[buy_ex][pair]['ask']
+                    bid = prices[sell_ex][pair]['bid']
+                    if not ask or not bid or bid <= ask:
+                        continue
+                    sim = simulate(pair, buy_ex, ask, sell_ex, bid, config.INVESTMENT_USDT, 'AUTO')
+                    if sim['net_pct'] < min_spread or sim['net_usdt'] <= 0:
+                        continue
+                    sim['pair'] = pair
+                    sim['buy_exchange'] = buy_ex
+                    sim['sell_exchange'] = sell_ex
+                    opps.append(sim)
 
         opps.sort(key=lambda x: x['net_pct'], reverse=True)
+        opps = opps[:config.TOP_LIMIT]
 
         with self.lock:
             self.prices = prices
