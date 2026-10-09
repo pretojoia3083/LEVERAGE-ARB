@@ -272,6 +272,7 @@ async function pollDashboard() {
 }
 
 /* ---------- SIMULADOR ---------- */
+let SIM_SIG = '';
 function fillSimSelects() {
   if (!DASH) return;
   const pricesWithData = {};
@@ -284,14 +285,32 @@ function fillSimSelects() {
     Object.values(pricesWithData)[0] || {}
   ).sort();
   const exs = Object.keys(pricesWithData);
+  // nao reconstrói a cada 5s (preserva o que o usuário escolheu)
+  const sig = pairs.join(',') + '|' + exs.join(',');
+  if (sig === SIM_SIG) return;
+  SIM_SIG = sig;
 
-  const keep = (sel, arr, val) => {
+  // padrão inteligente: compra no ask mais barato, vende no bid mais alto
+  let defBuy = exs[0] || '', defSell = exs[0] || '';
+  let bestAsk = Infinity, bestBid = 0, secondBid = 0, secondBidEx = '';
+  for (const ex of exs) {
+    const p = pricesWithData[ex]['USDT/BRL'];
+    if (p.ask < bestAsk) { bestAsk = p.ask; defBuy = ex; }
+    if (p.bid > bestBid) { secondBid = bestBid; secondBidEx = defSell; bestBid = p.bid; defSell = ex; }
+    else if (p.bid > secondBid) { secondBid = p.bid; secondBidEx = ex; }
+  }
+  if (defSell === defBuy && secondBidEx) defSell = secondBidEx;
+
+  const keep = (sel, arr, val, def) => {
+    if (!sel) return;
     sel.innerHTML = arr.map(x => `<option value="${x}">${x}</option>`).join('');
     if (val && arr.includes(val)) sel.value = val;
+    else if (def && arr.includes(def)) sel.value = def;
+    else if (arr.length) sel.value = arr[0];
   };
-  keep($('simPair'), pairs, $('simPair').value);
-  keep($('simBuy'), exs, $('simBuy').value);
-  keep($('simSell'), exs, $('simSell').value);
+  keep($('simPair'), pairs.length ? pairs : ['USDT/BRL'], $('simPair').value, 'USDT/BRL');
+  keep($('simBuy'), exs, $('simBuy').value, defBuy);
+  keep($('simSell'), exs, $('simSell').value, defSell);
 }
 
 window.fillSim = function (pair, buyEx, sellEx) {
@@ -306,6 +325,7 @@ window.fillSim = function (pair, buyEx, sellEx) {
 };
 
 async function runSim() {
+  const box = $('simResult');
   const payload = {
     pair: $('simPair').value,
     buy_exchange: $('simBuy').value,
@@ -313,12 +333,16 @@ async function runSim() {
     invest_usdt: parseFloat($('simInvest').value) || 1000,
     network: $('simNetwork').value,
   };
+  if (!payload.pair || !payload.buy_exchange || !payload.sell_exchange) {
+    box.className = 'muted';
+    box.textContent = 'Aguarde carregar os preços das corretoras...';
+    return;
+  }
   const res = await api('/api/simulate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const box = $('simResult');
   if (res.error) {
     box.className = 'red';
     box.textContent = res.error;
@@ -673,17 +697,42 @@ function setCalcAmount(v) {
   calcProfit();
 }
 
+// melhor rota ao vivo direto dos preços (menor ask -> maior bid),
+// usada quando nao ha oportunidade acima do spread minimo
+function bestRouteFromPrices(prices) {
+  try {
+    var exs = Object.keys(prices || {});
+    var best = null;
+    for (var i = 0; i < exs.length; i++) {
+      for (var j = 0; j < exs.length; j++) {
+        if (i === j) continue;
+        var bp = prices[exs[i]] && prices[exs[i]]['USDT/BRL'];
+        var sp = prices[exs[j]] && prices[exs[j]]['USDT/BRL'];
+        if (!bp || !sp || !bp.ask || !sp.bid) continue;
+        var g = (sp.bid - bp.ask) / bp.ask * 100;
+        if (!best || g > best.gross_pct) {
+          best = { buy_exchange: exs[i], sell_exchange: exs[j],
+                   buy_price: bp.ask, sell_price: sp.bid,
+                   gross_pct: Math.round(g * 10000) / 10000, network: 'BEP20' };
+        }
+      }
+    }
+    return best;
+  } catch (e) { return null; }
+}
+
 function calcProfit() {
   var el = function(id) { return document.getElementById(id); };
-  if (!DASH || !DASH.best) {
+  // se nao ha oportunidade acima do spread, usa a melhor rota ao vivo (menor ask -> maior bid)
+  var b = (DASH && DASH.best) || bestRouteFromPrices(DASH && DASH.prices);
+  if (!b) {
     ['calcRoute','calcSpread','calcFeeBuy','calcFeeSell','calcFeeNet','calcTotalFees','calcNet','calcPct','calcMonthly'].forEach(function(id) {
       var e = el(id); if (e) e.textContent = '\u2014';
     });
-    var r = el('calcRoute'); if (r) r.textContent = 'Sem oportunidade agora';
+    var r = el('calcRoute'); if (r) r.textContent = 'Aguardando preços...';
     return;
   }
   try {
-    var b = DASH.best;
     var inp = el('calcAmount');
     var brl = inp ? (parseFloat(inp.value) || 1000) : 1000;
     var rate = b.buy_price || 5.16;
