@@ -535,13 +535,19 @@ html, body {
   display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 0 20px 20px;
 }
 .calc-inputs { display: flex; flex-direction: column; gap: 12px; }
-.calc-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.calc-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .calc-preset {
-  padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: all .2s; font-family: inherit;
+  padding: 10px 18px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: linear-gradient(135deg, rgba(255,107,0,.06), rgba(255,107,0,.02));
+  color: var(--orange); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .25s; font-family: inherit;
+  position: relative; overflow: hidden;
 }
-.calc-preset:hover { border-color: var(--accent); color: var(--text); }
+.calc-preset:hover {
+  border-color: var(--orange); background: rgba(255,107,0,.12);
+  color: #fff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255,107,0,.25);
+}
+.calc-preset:active { transform: translateY(0); }
 .calc-result {
   background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
   padding: 16px 20px;
