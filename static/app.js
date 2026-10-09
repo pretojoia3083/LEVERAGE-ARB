@@ -141,6 +141,8 @@ function renderBest(best) {
 
 function renderOpps(list) {
   $('oppCount').textContent = list.length ? `${list.length} rotas com spread` : '';
+  const oi = $('oppInvest');
+  if (oi) oi.textContent = (DASH && DASH.investment) ? `· lucro calculado com ${fmtBrl(DASH.investment)} (troca no LeverageBot)` : '';
   const body = $('oppsBody');
   if (!list.length) {
     body.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:36px" class="muted">Sem oportunidades agora — o scanner continua monitorando...</td></tr>`;

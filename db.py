@@ -81,6 +81,12 @@ def _init():
         )
         """)
         c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS ok INTEGER DEFAULT 1")
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """)
     else:
         c.execute('PRAGMA journal_mode=WAL')
         c.execute("""
@@ -122,6 +128,12 @@ def _init():
         cols = [r[1] for r in c.execute("PRAGMA table_info(executions)").fetchall()]
         if 'ok' not in cols:
             c.execute("ALTER TABLE executions ADD COLUMN ok INTEGER DEFAULT 1")
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """)
     c.commit()
     c.close()
 
@@ -267,3 +279,27 @@ def execution_stats():
         'total_executed_net': round(total_net, 2),
         'successful_executions': wins,
     }
+
+
+def get_setting(key, default=None):
+    try:
+        c = _conn()
+        row = _exec(c, "SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+        c.close()
+        return row[0] if row else default
+    except Exception:
+        return default
+
+
+def set_setting(key, value):
+    with db_lock:
+        c = _conn()
+        if USE_PG:
+            _exec(c, "INSERT INTO app_settings(key, value) VALUES (?, ?) "
+                     "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                  (key, str(value)))
+        else:
+            _exec(c, "INSERT OR REPLACE INTO app_settings(key, value) VALUES (?, ?)",
+                  (key, str(value)))
+        c.commit()
+        c.close()

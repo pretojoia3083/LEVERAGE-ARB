@@ -28,6 +28,17 @@ LAST_OPPS = []
 def startup():
     def bootstrap():
         global LAST_OPPS
+        # valor e spread salvos continuam valendo após reiniciar/atualizar
+        try:
+            inv = db.get_setting('invest_usdt')
+            if inv and float(inv) >= 10:
+                config.INVESTMENT_USDT = float(inv)
+            spr = db.get_setting('min_spread')
+            if spr is not None and 0 <= float(spr) <= 5:
+                config.MIN_SPREAD_PCT = float(spr)
+            print(f"[LEVERAGE ARB] config salva: invest R${config.INVESTMENT_USDT} · spread {config.MIN_SPREAD_PCT}%")
+        except Exception as e:
+            print(f"[LEVERAGE ARB] config padrao ({e})")
         n = scanner.load_exchanges()
         print(f"[LEVERAGE ARB] {n} corretoras conectadas")
         while True:
@@ -115,6 +126,10 @@ def set_spread(req: SpreadRequest):
         if not (0 <= v <= 5):
             return {'error': 'spread invalido'}
     config.MIN_SPREAD_PCT = v
+    try:
+        db.set_setting('min_spread', v)
+    except Exception:
+        pass
     print(f"[SPREAD] minimo agora: {v}%")
     return {'ok': True, 'min_spread': v}
 
@@ -134,6 +149,10 @@ def set_investment(req: InvestmentRequest):
     if v < 10 or v > 1000000:
         return {'error': 'valor invalido (10 a 1000000)'}
     config.INVESTMENT_USDT = v
+    try:
+        db.set_setting('invest_usdt', v)
+    except Exception:
+        pass
     print(f"[INVEST] agora: {v} USDT")
     return {'ok': True, 'invest_usdt': v}
 
