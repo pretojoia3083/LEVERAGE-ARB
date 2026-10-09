@@ -148,11 +148,16 @@ class Executor:
                 f'Erro ao comprar em {buy_exchange}: {str(e)[:150]}')
 
         # ETAPA 4: Buscar endereço de depósito na exchange de venda
+        # (pede na rede da operação — endereço errado = perda do valor)
         try:
             sell_ex = self._get_exchange(sell_exchange)
-            addr = sell_ex.fetch_deposit_address('USDT')
-            deposit_addr = addr.get('address', '')
-            deposit_tag = addr.get('tag')
+            addr = None
+            try:
+                addr = sell_ex.fetch_deposit_address('USDT', {'network': network_name})
+            except Exception:
+                addr = sell_ex.fetch_deposit_address('USDT')
+            deposit_addr = (addr or {}).get('address', '')
+            deposit_tag = (addr or {}).get('tag')
             network_name = sim['network']
             print(f"[EXEC] Endereço {sell_exchange}: {deposit_addr} (rede: {network_name})")
         except Exception as e:
@@ -170,6 +175,8 @@ class Executor:
             'sell_exchange': sell_exchange,
             'buy_price': buy_price,
             'buy_qty': buy_qty,
+            # vende SÓ o que foi transferido (nunca o saldo antigo da conta)
+            'sell_qty': round(max(buy_qty - tx_fee / sell_side['bid'], 0), 8),
             'deposit_addr': deposit_addr,
             'deposit_tag': deposit_tag,
             'network': network_name,
@@ -257,7 +264,8 @@ class Executor:
         t['status'] = 'vendendo'
 
         try:
-            sell_qty = available_usdt
+            # vende no máximo o que a operação transferiu (protege saldo antigo)
+            sell_qty = min(float(available_usdt), float(t.get('sell_qty') or available_usdt))
             print(f"[EXEC] Vendendo {sell_qty:.6f} USDT em {t['sell_exchange']}...")
 
             sell_order = sell_ex.create_market_sell_order(t['pair'], sell_qty)

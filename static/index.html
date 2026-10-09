@@ -239,18 +239,18 @@
             <label class="label mt16">Corretora de venda (bid)</label>
             <select id="simSell" class="input"></select>
 
-            <label class="label mt16">Valor investido (USDT)</label>
+            <label class="label mt16">Valor investido (R$)</label>
             <input type="number" id="simInvest" class="input" value="1000" min="10" step="50">
 
             <label class="label mt16">Rede de saque</label>
             <select id="simNetwork" class="input">
-              <option value="AUTO">🤖 Auto — BEP20/Polygon primeiro</option>
-              <option value="BEP20">BEP20 (barata · ~3min)</option>
-              <option value="POLYGON">Polygon (mais barata · ~3min)</option>
-              <option value="ARBITRUM">Arbitrum (~3min)</option>
-              <option value="SOL">Solana (~1min)</option>
-              <option value="TRC20">TRC20 (~2min)</option>
-              <option value="ERC20">ERC20 (cara · ~15min)</option>
+              <option value="AUTO">🤖 Automático</option>
+              <option value="BEP20">BEP20</option>
+              <option value="POLYGON">Polygon</option>
+              <option value="ARBITRUM">Arbitrum</option>
+              <option value="SOL">Solana</option>
+              <option value="TRC20">TRC20</option>
+              <option value="ERC20">ERC20</option>
             </select>
 
             <button class="btn-primary w100 mt20" id="simRun">🚀 Rodar simulação</button>
@@ -307,22 +307,11 @@
           <div class="card-sub muted">Ligado = executa sozinho acima do spread mínimo</div>
         </div>
         <div class="card p5">
-          <div class="card-label">Valor por operação (USDT)</div>
+          <div class="card-label">Valor por operação (R$)</div>
           <input type="number" id="investInput" class="input" value="50" min="10" step="10" style="margin:10px 0">
           <button class="btn-save" onclick="saveInvestment()">💾 Salvar valor</button>
           <span class="muted small" id="investMsg" style="margin-left:8px"></span>
           <div class="card-sub muted">Várias operações pequenas compõem o capital</div>
-        </div>
-      </div>
-
-      <div class="card p5">
-        <h2>Como funciona</h2>
-        <div class="muted" style="line-height:1.9;font-size:14px">
-          1️⃣ O scanner lê o preço do USDT em todas as corretoras a cada 5 segundos.<br>
-          2️⃣ Quando acha lucro acima do <b>spread mínimo</b>, registra a simulação sozinho.<br>
-          3️⃣ Com o <b>robô ligado</b>, ele executa a melhor rota automaticamente.<br>
-          4️⃣ No modo <b>Real</b>, ele compra na corretora barata e te guia na transferência — a venda acontece sozinha quando o saldo chega.<br>
-          ⚠️ Para rodar 24h sem parar, deixe o servidor no ar (Render + UptimeRobot pingando <b>/api/health</b> a cada 5 min).
         </div>
       </div>
     </section>

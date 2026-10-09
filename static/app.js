@@ -71,10 +71,11 @@ function playBeep(frequency = 440, duration = 0.2) {
   } catch (e) { /* silencioso se falhar (ex: usuário bloqueou áudio) */ }
 }
 
-function fmtUsd(v) {
+function fmtBrl(v) {
   const n = Number(v) || 0;
   const sign = n < 0 ? '-' : '';
-  return `${sign}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // valores de trade do par USDT/BRL sao em BRL (moeda de cotacao)
+  return `${sign}R$${Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function fmtPrice(v) {
   const n = Number(v) || 0;
@@ -130,7 +131,7 @@ function renderBest(best) {
         ${exBadge(best.sell_exchange)} <span class="muted small">@${fmtPrice(best.sell_price)}</span>
         <span class="badge badge-green" style="margin-left:auto">${best.gross_pct}% spread</span>
         <span class="badge badge-orange">⏱ ${best.est_time_fmt}</span>
-        <b class="${best.net_usdt >= 0 ? 'green' : 'red'} font-display" style="font-size:18px">${fmtUsd(best.net_usdt)}</b>
+        <b class="${best.net_usdt >= 0 ? 'green' : 'red'} font-display" style="font-size:18px">${fmtBrl(best.net_usdt)}</b>
         <button class="btn-exec" onclick="execRoute('${best.pair}','${best.buy_exchange}','${best.sell_exchange}')">⚡ Executar</button>
       </div>
     </div>`;
@@ -152,7 +153,7 @@ function renderOpps(list) {
       <td><b>${o.network}</b> <span class="muted small">($${o.networks.find(n => n.network === o.network)?.withdrawal_fee_usd})</span></td>
       <td class="muted">${((o.taker_buy + o.taker_sell) * 100).toFixed(2)}%</td>
       <td><span class="badge badge-orange">⏱ ${o.est_time_fmt}</span></td>
-      <td class="right"><b class="${o.net_usdt >= 0 ? 'green' : 'red'}">${fmtUsd(o.net_usdt)}</b><br><span class="muted small">${o.net_pct}%</span></td>
+      <td class="right"><b class="${o.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(o.net_usdt)}</b><br><span class="muted small">${o.net_pct}%</span></td>
       <td><div class="exec-actions">
         <button class="btn-mini" onclick="fillSim('${o.pair}','${o.buy_exchange}','${o.sell_exchange}')">🧪</button>
         <button class="btn-exec" onclick="execRoute('${o.pair}','${o.buy_exchange}','${o.sell_exchange}')">⚡ Executar</button>
@@ -221,7 +222,7 @@ async function pollDashboard() {
       : 'aguardando primeira varredura...';
 
     const b = d.best;
-    $('stBest').textContent = b ? fmtUsd(b.net_usdt) : '—';
+    $('stBest').textContent = b ? fmtBrl(b.net_usdt) : '—';
     $('stBest').className = `card-value font-display ${b ? (b.net_usdt >= 0 ? 'green' : 'red') : ''}`;
     $('stBestSub').textContent = b ? `${b.pair} · ${b.buy_exchange} → ${b.sell_exchange}` : 'esperando spread';
 
@@ -329,7 +330,7 @@ async function runSim() {
       <td><b>${n.network}</b> ${n.network === res.network ? '<span class="tag-best">MELHOR</span>' : ''}</td>
       <td>$${n.withdrawal_fee_usd.toFixed(2)}</td>
       <td>${fmtTime(n.est_seconds)}</td>
-      <td class="${n.net_usdt >= 0 ? 'green' : 'red'}"><b>${fmtUsd(n.net_usdt)}</b></td>
+      <td class="${n.net_usdt >= 0 ? 'green' : 'red'}"><b>${fmtBrl(n.net_usdt)}</b></td>
       <td class="${n.net_pct >= 0 ? 'green' : 'red'}">${n.net_pct}%</td>
     </tr>`).join('');
 
@@ -350,7 +351,7 @@ async function runSim() {
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px">
         <span class="time-chip">⏱ Tempo total estimado: ${res.est_time_fmt}</span>
         <span style="font-size:20px">=</span>
-        <span class="net-big font-display ${res.net_usdt >= 0 ? 'green' : 'red'}">${fmtUsd(res.net_usdt)}</span>
+        <span class="net-big font-display ${res.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(res.net_usdt)}</span>
       </div>
       <table class="net-table">
         <thead><tr><th>Rede</th><th>Taxa saque</th><th>Tempo transfer.</th><th>Lucro líq.</th><th>%</th></tr></thead>
@@ -386,7 +387,7 @@ window.execRoute = async function (pair, buyEx, sellEx) {
     <h3 class="green">✔ Operação executada (#${res.id})</h3>
     <div class="row"><span>Rota</span><b>${res.pair} · ${res.buy_exchange} → ${res.sell_exchange}</b></div>
     <div class="row"><span>Rede</span><b>${res.network}</b></div>
-    <div class="row"><span>Lucro líquido</span><b class="${res.net_usdt >= 0 ? 'green' : 'red'}">${fmtUsd(res.net_usdt)} (${res.net_pct}%)</b></div>
+    <div class="row"><span>Lucro líquido</span><b class="${res.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(res.net_usdt)} (${res.net_pct}%)</b></div>
     <div class="row"><span>⏱ Tempo real da operação</span><b>${res.elapsed_fmt}</b></div>
     <div class="row"><span>Tempo em dinheiro real (com transferência)</span><b>~${fmtTime(res.est_real_seconds)}</b></div>
     <div class="muted" style="font-size:11px;margin-top:8px">Modo paper-trade: preços reais, ordens simuladas.</div>`;
@@ -399,9 +400,9 @@ async function loadHistory() {
     api('/api/simulations?limit=200'), api('/api/stats'), api('/api/executions?limit=100'),
   ]);
   $('hsCount').textContent = (stats.total_simulations ?? 0) + (stats.total_executions ?? 0);
-  $('hsTotal').textContent = fmtUsd((stats.total_net_usdt ?? 0) + (stats.total_executed_net ?? 0));
+  $('hsTotal').textContent = fmtBrl((stats.total_net_usdt ?? 0) + (stats.total_executed_net ?? 0));
   $('stSims').textContent = stats.total_simulations ?? 0;
-  $('stProfit').textContent = fmtUsd(stats.total_net_usdt ?? 0);
+  $('stProfit').textContent = fmtBrl(stats.total_net_usdt ?? 0);
   $('stProfit').className = `card-value font-display ${(stats.total_net_usdt ?? 0) >= 0 ? 'green' : 'red'}`;
   $('stAvg').textContent = `${stats.avg_net_pct ?? 0}% média por operação`;
   const br = stats.best_route;
@@ -418,9 +419,9 @@ async function loadHistory() {
       <td><div class="route-cell">${exBadge(h.buy_exchange)}<span class="arrow">→</span>${exBadge(h.sell_exchange)}</div></td>
       <td>${h.network}</td>
       <td>${h.gross_pct}%</td>
-      <td>${fmtUsd(h.invest_usdt)}</td>
+      <td>${fmtBrl(h.invest_usdt)}</td>
       <td>${fmtTime(h.est_seconds)}</td>
-      <td class="right"><b class="${h.net_usdt >= 0 ? 'green' : 'red'}">${fmtUsd(h.net_usdt)}</b></td>
+      <td class="right"><b class="${h.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(h.net_usdt)}</b></td>
     </tr>`).join('');
   $('histBody').innerHTML = rows ||
     `<tr><td colspan="9" style="text-align:center;padding:36px" class="muted">Nenhuma operação registrada ainda. O sistema registra automaticamente oportunidades ≥ 0.10% de lucro líquido.</td></tr>`;
@@ -432,9 +433,9 @@ async function loadHistory() {
       <td><div class="route-cell">${exBadge(x.buy_exchange)}<span class="arrow">→</span>${exBadge(x.sell_exchange)}</div></td>
       <td>${x.network}</td>
       <td><span class="badge badge-orange">${x.mode}</span></td>
-      <td>${fmtUsd(x.invest_usdt)}</td>
+      <td>${fmtBrl(x.invest_usdt)}</td>
       <td><span class="badge badge-green">⏱ ${x.elapsed_fmt}</span></td>
-      <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${fmtUsd(x.net_usdt)}</b></td>
+      <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(x.net_usdt)}</b></td>
     </tr>`).join('');
   $('execBody').innerHTML = exRows ||
     `<tr><td colspan="8" style="text-align:center;padding:36px" class="muted">Nenhuma execução ainda — clique em ⚡ Executar numa oportunidade.</td></tr>`;
@@ -767,7 +768,7 @@ function renderPending(pending) {
         <b>📋 Passo a passo:</b><br>
         1. Abra o app/site da <b>${t.from}</b><br>
         2. Vá em <b>Carteira → Sacar → USDT</b><br>
-        3. Rede: <b>${t.network}</b><br>
+        3. Rede: <b>${t.network}</b> — ⚠️ confira se o endereço abaixo é dessa rede!<br>
         4. Cole o endereço abaixo:<br>
         <div class="pending-addr">
           ${t.deposit_address}
