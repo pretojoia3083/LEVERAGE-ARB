@@ -355,6 +355,31 @@
 
       <div class="card p5">
         <div class="card-head noborder">
+          <h2>🎯 Spread da demo</h2>
+          <span class="muted small">o bot só entra acima desse lucro</span>
+        </div>
+        <div class="spread-pills" id="demoSpreadPills"></div>
+        <div class="spread-manual">
+          <input type="number" id="demoSpreadManual" class="input" min="0" max="5" step="0.05" placeholder="Valor manual % (ex: 0.35)">
+          <button class="btn-save" onclick="saveDemoSpread()">💾 Salvar spread</button>
+          <span class="muted small" id="demoSpreadMsg"></span>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>💰 Valor por operação (R$)</h2>
+          <span class="muted small">com quanto cada arbitragem começa (ex: 5000)</span>
+        </div>
+        <div class="spread-manual">
+          <input type="number" id="demoInvestInput" class="input" value="50" min="10" step="10" placeholder="Ex: 5000">
+          <button class="btn-save" onclick="saveDemoInvestment()">💾 Salvar valor</button>
+          <span class="muted small" id="demoInvestMsg"></span>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
           <h2>⏳ Operação demo em andamento</h2>
         </div>
         <div id="demoPending" class="muted">Nenhuma operação demo agora.</div>

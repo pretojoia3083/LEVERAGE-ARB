@@ -234,6 +234,7 @@ async function pollDashboard() {
     renderOpps(d.opportunities || []);
     renderPrices(d.prices, d.opportunities || [], d.exchanges_ok || []);
     renderSpreadPills(d.min_spread, d.spread_options);
+    renderSpreadPills(d.min_spread, d.spread_options, 'demoSpreadPills');
     fillSimSelects();
     renderBalSummary(d.balances || {});
     renderPending(d.pending_transfers || []);
@@ -241,6 +242,9 @@ async function pollDashboard() {
 
     if ($('investInput') && d.investment && document.activeElement !== $('investInput')) {
       $('investInput').value = d.investment;
+    }
+    if ($('demoInvestInput') && d.investment && document.activeElement !== $('demoInvestInput')) {
+      $('demoInvestInput').value = d.investment;
     }
     if ($('cotUpdated') && d.last_scan) {
       $('cotUpdated').textContent = `atualizado ${new Date(d.last_scan).toLocaleTimeString('pt-BR')} · ${(d.exchanges_ok || []).length} corretoras`;
@@ -487,23 +491,23 @@ setInterval(() => {
 }, 30000);
 
 /* ---------- SPREAD MINIMO ---------- */
-function renderSpreadPills(current, options) {
-  const box = $('spreadPills');
+function renderSpreadPills(current, options, boxId) {
+  const box = $(boxId || 'spreadPills');
   if (!box) return;
   const opts = options && options.length ? options : [0.10, 0.20, 0.50, 1.0, 2.0];
   box.innerHTML = opts.map(v => `
     <button class="spread-pill${Number(current) === Number(v) ? ' active' : ''}"
       onclick="setSpread(${v})">${Number(v).toFixed(2)}%</button>`).join('');
-  const man = $('spreadManual');
-  if (man && document.activeElement !== man && !opts.some(v => Number(v) === Number(current))) {
-    man.value = current;
+  for (const mid of ['spreadManual', 'demoSpreadManual']) {
+    const man = $(mid);
+    if (man && document.activeElement !== man && !opts.some(v => Number(v) === Number(current))) {
+      man.value = current;
+    }
   }
 }
 
-window.saveSpreadManual = async function() {
-  const inp = $('spreadManual');
-  const msg = $('spreadMsg');
-  const v = inp ? parseFloat(inp.value) : NaN;
+async function doSaveSpread(v, msgId) {
+  const msg = msgId ? $(msgId) : null;
   if (!(v >= 0) || v > 5) {
     if (msg) { msg.textContent = 'Digite um valor de 0 a 5'; msg.style.color = 'var(--red)'; }
     return;
@@ -514,7 +518,9 @@ window.saveSpreadManual = async function() {
     body: JSON.stringify({ min_spread: v }),
   });
   if (res.ok) {
-    renderSpreadPills(res.min_spread, (DASH && DASH.spread_options) || [0.10, 0.20, 0.50, 1.0, 2.0]);
+    const opts = (DASH && DASH.spread_options) || [0.10, 0.20, 0.50, 1.0, 2.0];
+    renderSpreadPills(res.min_spread, opts);
+    renderSpreadPills(res.min_spread, opts, 'demoSpreadPills');
     if (DASH) DASH.min_spread = res.min_spread;
     if (msg) { msg.textContent = `✓ Spread ${v}% salvo — o bot só entra acima disso`; msg.style.color = 'var(--green)'; }
     setTimeout(() => { if (msg) msg.textContent = ''; }, 4000);
@@ -523,6 +529,16 @@ window.saveSpreadManual = async function() {
     msg.textContent = '✗ ' + (res.error || 'erro');
     msg.style.color = 'var(--red)';
   }
+}
+
+window.saveSpreadManual = async function() {
+  const inp = $('spreadManual');
+  await doSaveSpread(inp ? parseFloat(inp.value) : NaN, 'spreadMsg');
+};
+
+window.saveDemoSpread = async function() {
+  const inp = $('demoSpreadManual');
+  await doSaveSpread(inp ? parseFloat(inp.value) : NaN, 'demoSpreadMsg');
 };
 
 window.setSpread = async function(v) {
@@ -539,19 +555,27 @@ window.setSpread = async function(v) {
 };
 
 /* ---------- INVESTIMENTO ---------- */
-window.saveInvestment = async function() {
-  const v = parseFloat($('investInput').value) || 0;
-  const msg = $('investMsg');
+async function doSaveInvestment(v, msgId) {
+  const msg = msgId ? $(msgId) : null;
   const res = await api('/api/investment', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ invest_usdt: v }),
   });
   if (msg) {
-    msg.textContent = res.ok ? '✓ Salvo!' : ('✗ ' + (res.error || 'erro'));
+    msg.textContent = res.ok ? `✓ Salvo! Oportunidades e bot passam a usar ${fmtBrl(res.invest_usdt || v)}` : ('✗ ' + (res.error || 'erro'));
     msg.style.color = res.ok ? 'var(--green)' : 'var(--red)';
-    setTimeout(() => { msg.textContent = ''; }, 3000);
+    setTimeout(() => { if (msg) msg.textContent = ''; }, 4000);
   }
+  if (res.ok) pollDashboard();
+}
+
+window.saveInvestment = async function() {
+  await doSaveInvestment(parseFloat($('investInput').value) || 0, 'investMsg');
+};
+
+window.saveDemoInvestment = async function() {
+  await doSaveInvestment(parseFloat($('demoInvestInput').value) || 0, 'demoInvestMsg');
 };
 
 /* ---------- BOT DEMO ---------- */
@@ -572,7 +596,7 @@ async function loadDemo() {
     const btn = $('demoToggleBtn');
     if (btn) {
       btn.textContent = on ? '⏹ Desligar BOT Demo' : '▶ Ligar BOT Demo';
-      btn.className = 'toggle-btn ' + (on ? 'active-orange' : '');
+      btn.className = 'toggle-btn ' + (on ? 'active-green' : '');
     }
     if (DASH) {
       $('demoSpread').textContent = (DASH.min_spread ?? 0.10) + '%';
