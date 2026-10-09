@@ -17,6 +17,8 @@ class Executor:
         self.pending_transfers = []
 
     def set_mode(self, mode):
+        if mode not in ('paper', 'demo', 'real'):
+            mode = 'paper'
         self.mode = mode
         print(f"[EXEC] Modo alterado para: {mode}")
 
@@ -63,6 +65,106 @@ class Executor:
             return self._execute_semi_auto(scanner, pair, buy_exchange, sell_exchange, invest_usdt, sim, buy_side, sell_side)
 
         return self._execute_paper(pair, buy_exchange, sell_exchange, invest_usdt, sim, buy_side, sell_side)
+
+    def execute_auto(self, scanner, o):
+        """Robo automatico: escolhe o fluxo conforme o modo (paper/demo/real)."""
+        if self.mode == 'demo':
+            with self.lock:
+                if any(t.get('demo') for t in self.pending_transfers):
+                    return {'ok': False, 'error': 'demo ja em andamento'}
+            return self._execute_demo(scanner, o)
+        return self.execute(scanner, o['pair'], o['buy_exchange'],
+                            o['sell_exchange'], o['invest_usdt'], o['network'])
+
+    def _execute_demo(self, scanner, o):
+        """Demo como se fosse real: compra na hora, 'transfere' e vende sozinho
+        apos DEMO_SETTLE_SECONDS, usando o preco AO VIVO da venda."""
+        import config as _cfg
+        snap = scanner.snapshot()
+        buy_side = snap['prices'].get(o['buy_exchange'], {}).get(o['pair'])
+        sell_side = snap['prices'].get(o['sell_exchange'], {}).get(o['pair'])
+        if not buy_side or not sell_side:
+            return self._error_result(o['pair'], o['buy_exchange'], o['sell_exchange'],
+                                      o['invest_usdt'], {}, 'Sem preço disponível (demo)')
+        sim = simulate(o['pair'], o['buy_exchange'], buy_side['ask'],
+                       o['sell_exchange'], sell_side['bid'], o['invest_usdt'], o['network'])
+        started = time.time()
+        buy_price = buy_side['ask']
+        buy_qty = sim['quantity']
+        chosen_net = next(n for n in sim['networks'] if n['network'] == sim['network'])
+        tx_fee = chosen_net['withdrawal_fee_usd']
+        stages = [{'stage': 'compra (demo)', 'exchange': o['buy_exchange'],
+                   'price': round(buy_price, 8), 'qty': round(buy_qty, 8),
+                   'seconds': 0}]
+        transfer = {
+            'id': self.counter + 1,
+            'pair': o['pair'],
+            'buy_exchange': o['buy_exchange'],
+            'sell_exchange': o['sell_exchange'],
+            'buy_price': buy_price,
+            'buy_qty': buy_qty,
+            'sell_qty': round(max(buy_qty - sim['networks'][0]['withdrawal_fee_usd'] / sell_side['bid'], 0), 8),
+            'demo': True,
+            'settle_at': started + getattr(_cfg, 'DEMO_SETTLE_SECONDS', 45),
+            'deposit_addr': 'demo — sem transferência real',
+            'deposit_tag': None,
+            'network': sim['network'],
+            'tx_fee': sim['networks'][0]['withdrawal_fee_usd'],
+            'sim': sim,
+            'sell_side': sell_side,
+            'stages': stages,
+            'started': started,
+            'status': 'aguardando_transferencia',
+            'invest_usdt': o['invest_usdt'],
+        }
+        with self.lock:
+            self.counter += 1
+            transfer['id'] = self.counter
+            self.pending_transfers.append(transfer)
+        print(f"[DEMO] Compra simulada {o['pair']} {o['buy_exchange']}->{o['sell_exchange']} "
+              f"R${o['invest_usdt']} — vende sozinha em {getattr(_cfg, 'DEMO_SETTLE_SECONDS', 45)}s")
+        result = {
+            'ok': True, 'id': transfer['id'], 'mode': 'demo',
+            'status': 'aguardando_transferencia',
+            'pair': o['pair'], 'buy_exchange': o['buy_exchange'],
+            'sell_exchange': o['sell_exchange'], 'invest_usdt': o['invest_usdt'],
+            'network': sim['network'], 'gross_pct': sim['gross_pct'],
+            'net_usdt': sim['net_usdt'], 'net_pct': sim['net_pct'],
+            'elapsed_ms': 0, 'elapsed_fmt': '0.0s',
+            'est_real_seconds': sim['est_seconds'], 'stages': stages,
+        }
+        db.add_execution(result)
+        return result
+
+    def _execute_demo_sell(self, scanner, t):
+        """Conclui a demo vendendo pelo preco ao vivo (como seria de verdade)."""
+        snap = scanner.snapshot()
+        cur = (snap['prices'].get(t['sell_exchange'], {}).get(t['pair']) or {})
+        sell_price = cur.get('bid') or t['sell_side']['bid']
+        sell_qty = min(float(t.get('sell_qty') or 0), float(t.get('buy_qty') or 0))
+        elapsed_ms = int((time.time() - t['started']) * 1000)
+        invest = t['invest_usdt']
+        gross_brl = sell_qty * sell_price
+        net = round(gross_brl - invest, 2)
+        net_pct = round(net / invest * 100, 4) if invest else 0
+        t['stages'].append({'stage': 'venda (demo)', 'exchange': t['sell_exchange'],
+                            'price': round(sell_price, 8), 'qty': round(sell_qty, 8),
+                            'seconds': round(time.time() - t['started'], 1)})
+        result = {
+            'ok': True, 'id': t['id'], 'mode': 'demo', 'status': 'concluido',
+            'pair': t['pair'], 'buy_exchange': t['buy_exchange'],
+            'sell_exchange': t['sell_exchange'], 'invest_usdt': invest,
+            'network': t['network'],
+            'gross_pct': round((sell_price - t['buy_price']) / t['buy_price'] * 100, 4),
+            'net_usdt': net, 'net_pct': net_pct,
+            'elapsed_ms': elapsed_ms, 'elapsed_fmt': f"{elapsed_ms / 1000:.1f}s",
+            'est_real_seconds': t['sim']['est_seconds'], 'stages': t['stages'],
+        }
+        db.add_execution(result)
+        with self.lock:
+            if t in self.pending_transfers:
+                self.pending_transfers.remove(t)
+        print(f"[DEMO] CONCLUIDA! {'Lucro' if net >= 0 else 'Prejuizo'}: R${net:.2f} ({net_pct}%)")
 
     def _execute_paper(self, pair, buy_exchange, sell_exchange, invest_usdt, sim, buy_side, sell_side):
         started = time.time()
@@ -240,6 +342,15 @@ class Executor:
             pending = list(self.pending_transfers)
 
         for t in pending:
+            # DEMO: vende sozinha quando chega a hora, pelo preço ao vivo
+            if t.get('demo'):
+                try:
+                    if time.time() >= t.get('settle_at', 0):
+                        self._execute_demo_sell(scanner, t)
+                except Exception as e:
+                    print(f"[DEMO] ⚠️ Erro ao concluir: {str(e)[:100]}")
+                continue
+
             if t['status'] != 'aguardando_transferencia':
                 continue
 
@@ -316,6 +427,7 @@ class Executor:
             t['status'] = 'erro_venda'
 
     def get_pending(self):
+        now = time.time()
         with self.lock:
             return [{
                 'id': t['id'],
@@ -328,6 +440,8 @@ class Executor:
                 'deposit_tag': t.get('deposit_tag'),
                 'tx_fee_usd': t['tx_fee'],
                 'status': t['status'],
+                'demo': bool(t.get('demo')),
+                'seconds_left': max(0, int(t.get('settle_at', 0) - now)) if t.get('demo') else None,
             } for t in self.pending_transfers]
 
     def _error_result(self, pair, buy_exchange, sell_exchange, invest_usdt, sim, error_msg):

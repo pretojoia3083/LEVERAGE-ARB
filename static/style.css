@@ -581,6 +581,12 @@ html, body {
   color: #000; box-shadow: 0 4px 14px rgba(255,107,0,.35);
 }
 .price-vol { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.spread-manual { display: flex; gap: 10px; align-items: center; padding: 0 20px 20px; flex-wrap: wrap; }
+.spread-manual .input { max-width: 220px; }
+.toggle-btn.active-orange {
+  border-color: var(--orange); background: linear-gradient(135deg, #FF6B00, #FFB347);
+  color: #000; font-weight: 800;
+}
 .calc-final span {
   font-size: 14px; font-weight: 600; color: var(--text);
 }

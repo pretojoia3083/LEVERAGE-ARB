@@ -33,10 +33,11 @@ function updateModeUI() {
   const label = $('modeLabel');
   const wrap = $('modeWrap');
   if (btn) {
-    btn.textContent = MODE === 'real' ? '🔴 REAL' : '📝 Paper';
-    btn.className = 'toggle-btn ' + (MODE === 'real' ? 'active-red' : '');
+    if (MODE === 'real') { btn.textContent = '🔴 REAL'; btn.className = 'toggle-btn active-red'; }
+    else if (MODE === 'demo') { btn.textContent = '🎬 Demo'; btn.className = 'toggle-btn active-orange'; }
+    else { btn.textContent = '📝 Paper'; btn.className = 'toggle-btn'; }
   }
-  if (label) label.textContent = MODE === 'real' ? 'Modo: REAL' : 'Modo: Paper';
+  if (label) label.textContent = MODE === 'real' ? 'Modo: REAL' : MODE === 'demo' ? 'Modo: Demo' : 'Modo: Paper';
   if (wrap) wrap.classList.toggle('real', MODE === 'real');
 }
 
@@ -107,9 +108,10 @@ document.querySelectorAll('.menu-item').forEach(btn => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     $(`tab-${btn.dataset.tab}`).classList.add('active');
-    if (btn.dataset.tab === 'analytics') loadHistory();
+    if (btn.dataset.tab === 'analytics' || btn.dataset.tab === 'historico') loadHistory();
     if (btn.dataset.tab === 'saldo') loadBalances();
     if (btn.dataset.tab === 'oportunidades') loadDex();
+    if (btn.dataset.tab === 'demobot') loadDemo();
     if (btn.dataset.tab === 'configuracao') { loadSettings(); }
   });
 });
@@ -475,7 +477,8 @@ $('btnClear').addEventListener('click', async () => {
 pollDashboard();
 setInterval(pollDashboard, 5000);
 setInterval(() => {
-  if ($('tab-analytics').classList.contains('active')) loadHistory();
+  if ($('tab-historico').classList.contains('active')) loadHistory();
+  if ($('tab-demobot').classList.contains('active')) loadDemo();
 }, 8000);
 setInterval(() => {
   if ($('tab-oportunidades').classList.contains('active')) loadDex();
@@ -485,11 +488,40 @@ setInterval(() => {
 function renderSpreadPills(current, options) {
   const box = $('spreadPills');
   if (!box) return;
-  const opts = options && options.length ? options : [0.10, 0.50, 1.0, 2.0];
+  const opts = options && options.length ? options : [0.10, 0.20, 0.50, 1.0, 2.0];
   box.innerHTML = opts.map(v => `
     <button class="spread-pill${Number(current) === Number(v) ? ' active' : ''}"
       onclick="setSpread(${v})">${Number(v).toFixed(2)}%</button>`).join('');
+  const man = $('spreadManual');
+  if (man && document.activeElement !== man && !opts.some(v => Number(v) === Number(current))) {
+    man.value = current;
+  }
 }
+
+window.saveSpreadManual = async function() {
+  const inp = $('spreadManual');
+  const msg = $('spreadMsg');
+  const v = inp ? parseFloat(inp.value) : NaN;
+  if (!(v >= 0) || v > 5) {
+    if (msg) { msg.textContent = 'Digite um valor de 0 a 5'; msg.style.color = 'var(--red)'; }
+    return;
+  }
+  const res = await api('/api/spread', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ min_spread: v }),
+  });
+  if (res.ok) {
+    renderSpreadPills(res.min_spread, (DASH && DASH.spread_options) || [0.10, 0.20, 0.50, 1.0, 2.0]);
+    if (DASH) DASH.min_spread = res.min_spread;
+    if (msg) { msg.textContent = `✓ Spread ${v}% salvo — o bot só entra acima disso`; msg.style.color = 'var(--green)'; }
+    setTimeout(() => { if (msg) msg.textContent = ''; }, 4000);
+    pollDashboard();
+  } else if (msg) {
+    msg.textContent = '✗ ' + (res.error || 'erro');
+    msg.style.color = 'var(--red)';
+  }
+};
 
 window.setSpread = async function(v) {
   const res = await api('/api/spread', {
@@ -498,7 +530,7 @@ window.setSpread = async function(v) {
     body: JSON.stringify({ min_spread: v }),
   });
   if (res.ok) {
-    renderSpreadPills(res.min_spread, (DASH && DASH.spread_options) || [0.10, 0.50, 1.0, 2.0]);
+    renderSpreadPills(res.min_spread, (DASH && DASH.spread_options) || [0.10, 0.20, 0.50, 1.0, 2.0]);
     if (DASH) DASH.min_spread = res.min_spread;
     pollDashboard();
   }
@@ -518,6 +550,81 @@ window.saveInvestment = async function() {
     msg.style.color = res.ok ? 'var(--green)' : 'var(--red)';
     setTimeout(() => { msg.textContent = ''; }, 3000);
   }
+};
+
+/* ---------- BOT DEMO ---------- */
+async function loadDemo() {
+  if (!$('demoState')) return;
+  try {
+    const [a, m] = await Promise.all([api('/api/auto'), api('/api/mode')]);
+    AUTO_ON = a.auto_trade;
+    MODE = m.mode || 'paper';
+    updateAutoUI();
+    updateModeUI();
+    const on = AUTO_ON && MODE === 'demo';
+    $('demoState').textContent = on ? '● Rodando' : 'Desligado';
+    $('demoState').className = 'card-value font-display ' + (on ? 'green' : 'orange');
+    $('demoStateSub').textContent = on
+      ? 'entrando sozinho acima do spread · dinheiro fictício'
+      : 'clique em Ligar pra começar';
+    const btn = $('demoToggleBtn');
+    if (btn) {
+      btn.textContent = on ? '⏹ Desligar BOT Demo' : '▶ Ligar BOT Demo';
+      btn.className = 'toggle-btn ' + (on ? 'active-orange' : '');
+    }
+    if (DASH) {
+      $('demoSpread').textContent = (DASH.min_spread ?? 0.10) + '%';
+      $('demoInvest').textContent = fmtBrl(DASH.investment ?? 50);
+    }
+    const pend = ((DASH && DASH.pending_transfers) || []).filter(t => t.demo);
+    const box = $('demoPending');
+    if (!pend.length) {
+      box.className = 'muted';
+      box.textContent = 'Nenhuma operação demo agora.';
+    } else {
+      box.className = '';
+      box.innerHTML = pend.map(t => `
+        <div class="pending-card">
+          <div class="pending-row"><span>Rota</span><b>${t.from} → ${t.to}</b></div>
+          <div class="pending-row"><span>Quantidade</span><b>${t.qty} USDT</b></div>
+          <div class="pending-row"><span>Rede</span><b>${t.network}</b></div>
+          <div class="pending-row"><span>Vende sozinha em</span><b class="orange">⏱ ${t.seconds_left ?? '?'}s</b></div>
+        </div>`).join('');
+    }
+    const ex = await api('/api/executions?limit=50');
+    const demos = (ex.data || []).filter(x => x.mode === 'demo');
+    $('demoExecBody').innerHTML = demos.map(x => `
+      <tr>
+        <td class="muted">${x.ts ? x.ts.replace('T', ' ').slice(5, 16) : ''}</td>
+        <td><div class="route-cell">${exBadge(x.buy_exchange)}<span class="arrow">→</span>${exBadge(x.sell_exchange)}</div></td>
+        <td>${x.network}</td>
+        <td>${fmtBrl(x.invest_usdt)}</td>
+        <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(x.net_usdt)}</b><br><span class="muted small">${x.net_pct}%</span></td>
+      </tr>`).join('') ||
+      `<tr><td colspan="5" style="text-align:center;padding:24px" class="muted">Nenhuma demo ainda — ligue o BOT Demo.</td></tr>`;
+  } catch (e) { /* servidor ainda subindo */ }
+}
+
+window.toggleDemo = async function() {
+  const btn = $('demoToggleBtn');
+  if (btn) { btn.textContent = 'Carregando...'; btn.disabled = true; }
+  try {
+    const m = await api('/api/mode');
+    if (m.mode === 'demo') {
+      await api('/api/auto', { method: 'POST' }); // liga/desliga mantendo demo
+    } else {
+      await api('/api/mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'demo' }),
+      });
+      const a = await api('/api/auto');
+      if (!a.auto_trade) await api('/api/auto', { method: 'POST' });
+    }
+  } catch (e) { /* ignora */ }
+  if (btn) btn.disabled = false;
+  await pollDashboard();
+  loadDemo();
 };
 
 /* ---------- DEX KYBERSWAP ---------- */
@@ -781,6 +888,27 @@ function renderPending(pending) {
   body.innerHTML = pending.map(t => {
     const color = EX_COLORS[t.from] || 'var(--text)';
     const colorTo = EX_COLORS[t.to] || 'var(--text)';
+    if (t.demo) {
+      return `
+      <div class="pending-card">
+        <div class="pending-row">
+          <span>Modo</span><b class="orange">🎬 DEMO (fictício)</b>
+        </div>
+        <div class="pending-row">
+          <span>Rota</span>
+          <b><span style="color:${color}">${t.from}</span> → <span style="color:${colorTo}">${t.to}</span></b>
+        </div>
+        <div class="pending-row">
+          <span>Quantidade</span><b style="color:var(--green)">${t.qty} USDT</b>
+        </div>
+        <div class="pending-row">
+          <span>Rede</span><b>${t.network}</b>
+        </div>
+        <div class="pending-row">
+          <span>Vende sozinha em</span><b class="orange">⏱ ${t.seconds_left ?? '?'}s</b>
+        </div>
+      </div>`;
+    }
     return `
     <div class="pending-card">
       <div class="pending-row">

@@ -54,16 +54,22 @@ def startup():
 
                 if AUTO_TRADE and opps:
                     best = opps[0]
-                    min_pct = 0.30 if executor.mode == 'real' else config.AUTO_SIM_THRESHOLD
-                    if best['net_pct'] >= min_pct and best['net_usdt'] > 0:
-                        print(f"[AUTO] Executando {best['pair']} {best['buy_exchange']}->{best['sell_exchange']} +{best['net_pct']}% ({executor.mode})")
-                        executor.execute(
-                            scanner, best['pair'],
-                            best['buy_exchange'], best['sell_exchange'],
-                            best['invest_usdt'], best['network'],
-                        )
+                    min_pct = config.MIN_SPREAD_PCT
+                    if best['net_pct'] >= min_pct and best['net_usdt'] >= config.AUTO_SIM_DOLLAR_MIN:
+                        if executor.mode == 'demo':
+                            r = executor.execute_auto(scanner, best)
+                            if r.get('ok'):
+                                print(f"[DEMO-AUTO] Demo iniciada {best['pair']} "
+                                      f"{best['buy_exchange']}->{best['sell_exchange']} +{best['net_pct']}%")
+                        else:
+                            print(f"[AUTO] Executando {best['pair']} {best['buy_exchange']}->{best['sell_exchange']} +{best['net_pct']}% ({executor.mode})")
+                            executor.execute(
+                                scanner, best['pair'],
+                                best['buy_exchange'], best['sell_exchange'],
+                                best['invest_usdt'], best['network'],
+                            )
 
-                if executor.mode == 'real':
+                if executor.mode in ('real', 'demo'):
                     executor.check_deposits(scanner)
             except Exception as e:
                 print(f"[ERRO] scan: {e}")
@@ -174,9 +180,18 @@ def get_mode():
     return {'mode': executor.mode}
 
 
+class ModeRequest(BaseModel):
+    mode: str | None = None
+
+
 @app.post("/api/mode")
-def set_mode():
-    new_mode = 'real' if executor.mode == 'paper' else 'paper'
+def set_mode(req: ModeRequest | None = None):
+    order = ['paper', 'demo', 'real']
+    cur = executor.mode if executor.mode in order else 'paper'
+    if req and req.mode in order:
+        new_mode = req.mode
+    else:
+        new_mode = order[(order.index(cur) + 1) % len(order)]
     executor.set_mode(new_mode)
     print(f"[MODE] Alterado para: {new_mode}")
     return {'mode': new_mode}

@@ -20,9 +20,12 @@ AUTO_SIM_COOLDOWN = 60
 SCAN_INTERVAL = 5
 TOP_LIMIT = 50
 
-# Spread minimo exibido nas oportunidades (escolhido no menu: 0.10 / 0.50 / 1.0 / 2.0)
-SPREAD_OPTIONS = [0.10, 0.50, 1.0, 2.0]
+# Spread minimo exibido nas oportunidades (escolhido no menu: 0.10 / 0.20 / 0.50 / 1.0 / 2.0 ou manual)
+SPREAD_OPTIONS = [0.10, 0.20, 0.50, 1.0, 2.0]
 MIN_SPREAD_PCT = float(os.environ.get('MIN_SPREAD_PCT', '0.10'))
+
+# Demo: tempo simulado da transferencia antes da venda automatica (segundos)
+DEMO_SETTLE_SECONDS = 45
 
 # Redes preferidas (BEP20 + Polygon primeiro, resto como reserva)
 NETWORK_PRIORITY = ['BEP20', 'POLYGON', 'ARBITRUM', 'SOL', 'TRC20', 'ERC20']
