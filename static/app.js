@@ -516,7 +516,11 @@ function renderSummary(d, st) {
   const mode = (d && d.mode) || 'paper';
   const byMode = (st && st.by_mode) || {};
   const daily = (st && st.daily) || {};
-  const dia = daily.dia || { ops: 0, net: 0 };
+  // no modo demo/real, mostra so o lucro daquele modo (nao mistura paper)
+  const dailyF = (mode === 'demo' && st && st.daily_demo) ? st.daily_demo
+    : (mode === 'real' && st && st.daily_real) ? st.daily_real
+    : daily;
+  const dia = dailyF.dia || { ops: 0, net: 0 };
   const acum = daily.acumulado || { ops: 0, net: 0 };
   const demo = byMode.demo || { ops: 0, net: 0 };
   const real = byMode.real || { ops: 0, net: 0 };
@@ -583,7 +587,10 @@ function renderSummary(d, st) {
   if (opsEl) opsEl.textContent = dia.ops || 0;
 
   const bEl = $('sumBest');
-  if (bEl) bEl.textContent = daily.melhor_hoje ? fmtBrl(daily.melhor_hoje.net_usdt) : '—';
+  if (bEl) {
+    const melhor = (dailyF.melhor_hoje) || null;
+    bEl.textContent = melhor ? fmtBrl(melhor.net_usdt) : '—';
+  }
 }
 
 window.refreshSaldos = async function() {

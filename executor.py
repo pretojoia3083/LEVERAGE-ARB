@@ -105,9 +105,24 @@ class Executor:
     def demo_wallet_state(self):
         return {ex: dict(v) for ex, v in self.wallet.items()}
 
+    def sync_capital(self):
+        """Capital virtual = valor inicial + lucro de hoje.
+        Assim o lucro realmente entra na proxima arbitragem, mesmo depois
+        de o servidor ter reiniciado (o lucro fica salvo no banco)."""
+        if self.using_real_balance:
+            return
+        try:
+            d = db.daily_stats(mode='demo')
+            self.demo_capital = round(float(self.capital_base) + float(d['dia']['net']), 2)
+        except Exception:
+            pass
+
     def _demo_size(self, o):
         """Quanto usar na proxima operacao.
         Com juros compostos, usa TODO o saldo (lucro incluido)."""
+        # so sincroniza quando nao ha ciclo em andamento (evita contar em dobro)
+        if not any(t.get('demo') for t in self.pending_transfers):
+            self.sync_capital()
         if getattr(config, 'DEMO_ALL_CAPITAL', True):
             cap = float(self.demo_capital)
             if cap >= 20:
@@ -190,13 +205,15 @@ class Executor:
 
     def demo_status(self, scanner=None):
         now = time.time()
-        # reset diario do capital virtual: volta ao valor inicial a cada midnight
+        # reset diario: a cada meia-noite o lucro de hoje zera e o capital volta ao inicial
         hoje = datetime.now(BRT).date().isoformat()
         if not self.using_real_balance and getattr(self, '_capital_day', None) != hoje:
             if getattr(self, '_capital_day', None) is not None:
-                print("[DEMO] novo dia — capital virtual reiniciado")
-            self.demo_capital = float(self.capital_base)
+                print("[DEMO] novo dia — lucro zera, capital volta ao inicial")
             self._capital_day = hoje
+        # mantem o capital = inicial + lucro de hoje (lucro entra na proxima)
+        if not any(t.get('demo') for t in self.pending_transfers):
+            self.sync_capital()
         hubs = []
         if scanner is not None:
             try:

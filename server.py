@@ -258,7 +258,8 @@ def demo_status():
     try:
         s = executor.demo_status(scanner)
         try:
-            d = db.daily_stats()
+            # so operacoes DEMO (nao mistura paper/real no resultado da demo)
+            d = db.daily_stats(mode='demo')
             s['lucro_hoje'] = d['dia']['net']
             if not s.get('usando_saldo_real'):
                 # saldo da demo = capital inicial + lucro de hoje
@@ -412,7 +413,10 @@ def stats():
     s['investment'] = config.INVESTMENT_USDT
     s.update(db.execution_stats())
     try:
+        # resultado do dia separado por modo: demo nao mistura com paper/real
         s['daily'] = db.daily_stats()
+        s['daily_demo'] = db.daily_stats(mode='demo')
+        s['daily_real'] = db.daily_stats(mode='real')
     except Exception as e:
         s['daily'] = {'erro': str(e)[:120]}
     return s

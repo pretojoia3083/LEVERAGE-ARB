@@ -300,12 +300,18 @@ def _brt_day(v):
     return d.astimezone(BRT).date().isoformat()
 
 
-def daily_stats():
-    """Separa o resultado de HOJE (zera à meia-noite) do ACUMULADO de sempre."""
+def daily_stats(mode=None):
+    """Separa o resultado de HOJE (zera à meia-noite) do ACUMULADO de sempre.
+    mode='demo'/'real'/'paper' filtra só um tipo de operação."""
     hoje = datetime.now(BRT).date().isoformat()
     c = _conn()
-    ex_rows = _exec(c, "SELECT ts, net_usdt, mode, buy_exchange, sell_exchange, network "
-                       "FROM executions").fetchall()
+    ex_sql = ("SELECT ts, net_usdt, mode, buy_exchange, sell_exchange, network "
+              "FROM executions")
+    ex_params = ()
+    if mode:
+        ex_sql += " WHERE mode = ?"
+        ex_params = (mode,)
+    ex_rows = _exec(c, ex_sql, ex_params).fetchall()
     sim_rows = _exec(c, "SELECT ts, net_usdt, buy_exchange, sell_exchange, network "
                         "FROM simulations").fetchall()
     c.close()
