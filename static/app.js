@@ -540,28 +540,27 @@ function renderSummary(d, st) {
   setVal('sumDia', dia.net || 0);
   setVal('sumAcum', acum.net || 0);
 
-  // saldo (carteira do bot)
+  // saldo: capital unico que gira entre as corretoras
   const saldoEl = $('sumSaldo');
   const wbox = $('sumWallet');
-  if (mode === 'demo' && st && st.wallet && Object.keys(st.wallet).length) {
-    const totalBrl = st.total_brl || 0;
-    if (saldoEl) {
-      saldoEl.textContent = fmtBrl(totalBrl);
-      saldoEl.className = 'card-value font-display ' + (totalBrl > 0 ? 'green' : '');
-    }
-    if (wbox) {
-      wbox.innerHTML = Object.keys(st.wallet).map(ex => `
-        <div class="balance-card">
-          <div class="balance-card-header">
-            <span class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</span>
-          </div>
-          <div class="balance-coin"><span class="balance-coin-name">BRL</span><span class="balance-coin-free">${fmtBrl(st.wallet[ex].BRL)}</span></div>
-          <div class="balance-coin"><span class="balance-coin-name">USDT</span><span class="balance-coin-free">${(st.wallet[ex].USDT || 0).toFixed(2)}</span></div>
-        </div>`).join('');
-    }
-  } else {
-    if (saldoEl) { saldoEl.textContent = '—'; saldoEl.className = 'card-value font-display'; }
-    if (wbox) wbox.innerHTML = '';
+  const saldos = (st && st.saldos) || null;
+  if (saldoEl) {
+    const v = st ? (st.capital ?? st.total_brl ?? 0) : 0;
+    saldoEl.textContent = fmtBrl(v);
+    saldoEl.className = 'card-value font-display ' + (v > 0 ? 'green' : '');
+  }
+  if (wbox) {
+    const base = saldos && Object.keys(saldos).length ? saldos : (st && st.wallet) || {};
+    const chaves = Object.keys(base);
+    wbox.innerHTML = chaves.length ? chaves.map(ex => `
+      <div class="balance-card">
+        <div class="balance-card-header">
+          <span class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</span>
+          <span class="bal-status ok">✓</span>
+        </div>
+        <div class="balance-coin"><span class="balance-coin-name">BRL</span><span class="balance-coin-free">${fmtBrl(base[ex].BRL)}</span></div>
+        <div class="balance-coin"><span class="balance-coin-name">USDT</span><span class="balance-coin-free">${(base[ex].USDT || 0).toFixed(2)}</span></div>
+      </div>`).join('') : '<div class="balance-empty">configure a API key de uma corretora para o bot usar seu saldo real</div>';
   }
 
   const opsEl = $('sumOps');
@@ -677,6 +676,33 @@ window.saveInvestment = async function() {
   await doSaveInvestment(parseFloat($('investInput').value) || 0, 'investMsg');
 };
 
+window.saveHome = async function() {
+  const sel = $('homeSelect');
+  const msg = $('homeMsg');
+  const res = await api('/api/home', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ home: sel ? sel.value : 'auto' }),
+  });
+  if (msg) {
+    msg.textContent = res.ok ? '✓ Salvo! O lucro volta pra ' + res.home : '✗ erro';
+    msg.style.color = res.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(() => { if (msg) msg.textContent = ''; }, 3500);
+  }
+  loadDemo();
+};
+
+window.toggleAllCapital = async function() {
+  const btn = $('allCapitalBtn');
+  const on = !(btn && btn.dataset.on === '1');
+  const res = await api('/api/all-capital', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: on }),
+  });
+  if (res.ok) loadDemo();
+};
+
 window.saveDemoInvestment = async function() {
   await doSaveInvestment(parseFloat($('demoInvestInput').value) || 0, 'demoInvestMsg');
 };
@@ -696,9 +722,11 @@ async function loadDemo() {
     $('demoState').textContent = on ? '● Rodando' : 'Desligado';
     $('demoState').className = 'card-value font-display ' + (on ? 'green' : 'orange');
     const rotas = Object.entries(st.routes_waiting || {});
+    const home = st.home_exchange && st.home_exchange !== 'auto' ? st.home_exchange : null;
     const esperaTxt = rotas.length
       ? `aguardando spread reacender: ${rotas.map(([r, m2]) => `${r} (${m2}min)`).join(', ')}`
-      : 'entrando sozinho quando o spread estiver favorável';
+      : (home ? `entra quando comprar barato e vender na ${home} for favorável`
+              : 'entrando sozinho quando o spread estiver favorável');
     $('demoStateSub').textContent = on ? esperaTxt : 'clique em Ligar pra começar';
 
     const btn = $('demoToggleBtn');
@@ -709,6 +737,20 @@ async function loadDemo() {
     if (DASH) {
       $('demoSpread').textContent = (st.spread_alvo ?? DASH.min_spread ?? 0.1) + '%';
       $('demoInvest').textContent = fmtBrl(DASH.investment ?? 50);
+    }
+
+    // corretora principal (hub)
+    const sel = $('homeSelect');
+    if (sel) {
+      const opts = ['auto', 'binance', 'bitget', 'okx', 'mexc', 'mercadobitcoin'];
+      const exs = Array.from(new Set(opts.concat(Object.keys(DASH && DASH.prices || {}))))
+        .filter(x => x === 'auto' || (DASH && DASH.prices && DASH.prices[x]));
+      if (!sel.dataset.ready) {
+        sel.innerHTML = exs.map(x => `<option value="${x}">${x === 'auto' ? 'Automática (qualquer par)' : x}</option>`).join('');
+        sel.dataset.ready = '1';
+      }
+      const want = (st.home_exchange && st.home_exchange !== 'auto') ? st.home_exchange : 'auto';
+      if ([...sel.options].some(o => o.value === want)) sel.value = want;
     }
 
     // info de regras
@@ -737,6 +779,31 @@ async function loadDemo() {
           <div class="balance-coin"><span class="balance-coin-name">USDT</span><span class="balance-coin-free">${(w[ex].USDT || 0).toFixed(2)}</span></div>
         </div>`).join('') : '<div class="balance-empty">ligue o BOT Demo para ver o dinheiro se movendo</div>';
     }
+    const acBtn = $('allCapitalBtn');
+    if (acBtn) {
+      const on = !!st.all_capital;
+      acBtn.dataset.on = on ? '1' : '0';
+      acBtn.textContent = on ? '💰 Usando todo o saldo' : '💰 Usar todo o saldo';
+      acBtn.className = 'btn-mini' + (on ? ' active-green' : '');
+      const ch = $('compoundHint');
+      if (ch) {
+        ch.textContent = on
+          ? `juros compostos: cada arbitragem usa o saldo inteiro (R$${(st.capital || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) e o lucro entra na próxima`
+          : `valor fixo de R$${(DASH && DASH.investment) || 0} por operação`;
+      }
+    }
+
+    // ranking: qual corretora principal da o melhor lucro liquido agora
+    const rank = $('hubRank');
+    if (rank) {
+      const hubs = st.hubs || [];
+      rank.innerHTML = hubs.length
+        ? 'melhor principal agora: ' + hubs.slice(0, 4).map(h =>
+            `<b style="color:${EX_COLORS[h.hub] || 'var(--text)'}">${h.hub}</b> ${h.net_pct >= 0 ? '+' : ''}${h.net_pct}%`
+          ).join(' · ')
+        : '';
+    }
+
     const pend = ((DASH && DASH.pending_transfers) || []).filter(t => t.demo);
     const box = $('demoPending');
     if (!pend.length) {

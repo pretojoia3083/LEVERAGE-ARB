@@ -24,6 +24,14 @@ TOP_LIMIT = 50
 SPREAD_OPTIONS = [0.00, 0.02, 0.05, 0.10, 0.20, 0.50, 1.0, 2.0]
 MIN_SPREAD_PCT = float(os.environ.get('MIN_SPREAD_PCT', '0.10'))
 
+# "Corretora principal" (hub): e onde o BRL fica e onde o lucro volta.
+# Binance tem as taxas de saque mais baratas (BEP20 ~R$0,01 / Polygon ~R$0,07),
+# entao serve de nucleo. Use 'auto' para deixar o bot escolher qualquer par.
+HOME_EXCHANGE = os.environ.get('HOME_EXCHANGE', 'binance').strip().lower()
+
+# usa TODO o saldo disponivel a cada arbitragem (juros compostos: o lucro entra na proxima)
+DEMO_ALL_CAPITAL = os.environ.get('DEMO_ALL_CAPITAL', '1').strip().lower() in ('1', 'true', 'yes', 'sim')
+
 # Demo: tempo simulado da transferencia antes da venda automatica (segundos).
 # 0 = usa o tempo estimado real da rota (ex: ~3min). Ver executor.py.
 DEMO_SETTLE_SECONDS = 0

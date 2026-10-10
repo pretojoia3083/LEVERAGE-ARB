@@ -39,6 +39,12 @@ def startup():
             md = db.get_setting('mode')
             if md in ('paper', 'demo', 'real'):
                 executor.set_mode(md)
+            hm = db.get_setting('home_exchange')
+            if hm:
+                executor.set_home(hm)
+            ac = db.get_setting('demo_all_capital')
+            if ac is not None:
+                config.DEMO_ALL_CAPITAL = ac == '1'
             at = db.get_setting('auto_trade')
             AUTO_TRADE = (at == '1')
             print(f"[LEVERAGE ARB] config salva: invest R${config.INVESTMENT_USDT} · spread {config.MIN_SPREAD_PCT}% · modo {executor.mode} · auto {'ON' if AUTO_TRADE else 'OFF'}")
@@ -89,6 +95,8 @@ def startup():
 
                 if executor.mode in ('real', 'demo') or executor.get_pending():
                     executor.check_deposits(scanner)
+                if executor.mode == 'demo':
+                    executor.refresh_real_balances(scanner)
             except Exception as e:
                 print(f"[ERRO] scan: {e}")
             time.sleep(config.SCAN_INTERVAL)
@@ -209,10 +217,45 @@ def demo_run():
         return {'ok': False, 'error': str(e)[:150]}
 
 
+@app.get("/api/home")
+def get_home():
+    return {'home': config.HOME_EXCHANGE, 'auto': 'auto' in ('', config.HOME_EXCHANGE)}
+
+
+class HomeRequest(BaseModel):
+    home: str
+
+
+@app.post("/api/home")
+def set_home(req: HomeRequest):
+    executor.set_home(req.home)
+    return {'ok': True, 'home': config.HOME_EXCHANGE}
+
+
+@app.get("/api/all-capital")
+def get_all_capital():
+    return {'all_capital': bool(getattr(config, 'DEMO_ALL_CAPITAL', True))}
+
+
+class AllCapitalRequest(BaseModel):
+    value: bool
+
+
+@app.post("/api/all-capital")
+def set_all_capital(req: AllCapitalRequest):
+    config.DEMO_ALL_CAPITAL = bool(req.value)
+    try:
+        db.set_setting('demo_all_capital', '1' if config.DEMO_ALL_CAPITAL else '0')
+    except Exception:
+        pass
+    print(f"[DEMO] usar todo o saldo: {'SIM' if config.DEMO_ALL_CAPITAL else 'NAO'}")
+    return {'ok': True, 'all_capital': config.DEMO_ALL_CAPITAL}
+
+
 @app.get("/api/demo/status")
 def demo_status():
     try:
-        return executor.demo_status()
+        return executor.demo_status(scanner)
     except Exception as e:
         return {'erro': str(e)[:150]}
 

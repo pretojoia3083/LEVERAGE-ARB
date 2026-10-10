@@ -26,19 +26,82 @@ class Executor:
         self.pending_transfers = []
         # controle realista da demo
         self.wallet = {}          # {ex: {'BRL': float, 'USDT': float}}
+        # CAPITAL UNICO: comeca em DEMO_START_BRL (R$5.000) e GIRA entre as
+        # corretoras — vai para a de compra a cada ciclo e volta (com lucro) no fim.
+        self.demo_capital = config.DEMO_START_BRL
+        self.capital_base = config.DEMO_START_BRL  # base para calcular lucro
+        self.balances_cache = {}   # saldos REAIS por corretora (quando ha API key)
+        self.real_total_brl = 0.0
+        self.real_total_usdt = 0.0
+        self.using_real_balance = False
+        self.capital_in_use = None  # {ex, amount} enquanto o ciclo esta em andamento
+        home = (getattr(config, 'HOME_EXCHANGE', '') or '').strip().lower()
+        self.home_exchange = None if home in ('', 'auto') else home
         self._demo_routes = {}    # rota -> ultima vez executada
         self._demo_last = 0       # ultima operacao demo (timestamp)
         self._demo_times = []     # timestamps das operacoes demo (teto diario)
         self._demo_ref = None     # (spread_pct, timestamp) da ultima operacao
 
+    def refresh_real_balances(self, scanner, min_interval=60):
+        """Puxa o saldo REAL das corretoras (via API key) para usar de capital.
+        Actualiza a cada ~1min para nao estourar rate limit."""
+        now = time.time()
+        if now - getattr(self, '_last_bal', 0) < min_interval:
+            return self.balances_cache
+        self._last_bal = now
+        try:
+            b = scanner.fetch_balances()
+        except Exception as e:
+            print(f"[EXEC] ⚠️ saldo indisponivel: {str(e)[:80]}")
+            return self.balances_cache
+        cache = {}
+        total_brl = 0.0
+        total_usdt = 0.0
+        for ex, info in (b or {}).items():
+            if not isinstance(info, dict) or info.get('error'):
+                continue
+            coins = info.get('coins') or {}
+            brl = float((coins.get('BRL') or {}).get('total') or 0)
+            usdt = float((coins.get('USDT') or {}).get('total') or 0)
+            if brl or usdt:
+                cache[ex] = {'BRL': brl, 'USDT': usdt}
+                total_brl += brl
+                total_usdt += usdt
+        self.balances_cache = cache
+        self.real_total_brl = round(total_brl, 2)
+        self.real_total_usdt = round(total_usdt, 2)
+        if total_brl > 0:
+            # capital real disponible e a fonte de verdade da demo
+            if not self.using_real_balance:
+                # primeira vez com saldo real: a base passa a ser ele
+                self.capital_base = round(total_brl, 2)
+            self.demo_capital = round(total_brl, 2)
+            self.using_real_balance = True
+        return cache
+
+    def available_for(self, exchange, invest):
+        """Capital disponivel. O BRL fica na corretora principal (casa) e viaja
+        ate a corretora de compra, entao o limite e o capital acumulado em casa."""
+        return float(self.demo_capital), self.using_real_balance
+
     def demo_wallet_for(self, ex):
-        """Carteira virtual: cada corretora comeca com o capital inicial."""
+        """Carteira virtual por corretora (so o USDT que chega nela; o BRL e o
+        capital unico que circula)."""
         if ex not in self.wallet:
-            self.wallet[ex] = {'BRL': config.DEMO_START_BRL, 'USDT': 0.0}
+            self.wallet[ex] = {'BRL': 0.0, 'USDT': 0.0}
         return self.wallet[ex]
 
     def demo_wallet_state(self):
         return {ex: dict(v) for ex, v in self.wallet.items()}
+
+    def _demo_size(self, o):
+        """Quanto usar na proxima operacao.
+        Com juros compostos, usa TODO o saldo (lucro incluido)."""
+        if getattr(config, 'DEMO_ALL_CAPITAL', True):
+            cap = float(self.demo_capital)
+            if cap >= 20:
+                return round(cap, 2)
+        return float(o.get('invest_usdt') or config.INVESTMENT_USDT)
 
     def _demo_blocked_reason(self, o):
         """Travas que impedem arbitragem continua/infinita (igual vida real)."""
@@ -73,12 +136,55 @@ class Executor:
                 if espera > 0:
                     return f'spread desta rota ({rota[0]}→{rota[1]}) reacende em {int(espera // 60)}min'
             w = self.demo_wallet_for(o.get('buy_exchange'))
-            if float(w.get('BRL', 0)) < 10:
-                return f'sem BRL na {o.get("buy_exchange")} (carteira virtual)'
+            disponivel, real = self.available_for(o.get('buy_exchange'), o.get('invest_usdt') or 0)
+            casa = self.home_exchange or 'capital'
+            if float(disponivel) < 10:
+                return f'sem capital em {casa} (todas as carteiras em operação)'
+            if float(disponivel) < float(o.get('invest_usdt') or 0):
+                return (f'capital insuficiente em {casa}: {fmt_brl(disponivel)} '
+                        f'(operação pede {fmt_brl(o.get("invest_usdt"))})')
         return None
 
-    def demo_status(self):
+    def _hubs_ranking(self, prices, pair='USDT/BRL', invest=None):
+        """Para cada corretora como 'principal', qual o melhor lucro liquido?
+        Serve para escolher o hub com base em-spread E taxa (nao no chute)."""
+        invest = float(invest or config.INVESTMENT_USDT)
+        out = []
+        exs = [e for e, m in prices.items() if (m.get(pair) or {}).get('bid')]
+        for hub in exs:
+            hub_bid = prices[hub][pair]['bid']
+            best = None
+            for buy_ex, m in prices.items():
+                if buy_ex == hub:
+                    continue
+                ask = (m.get(pair) or {}).get('ask')
+                if not ask or ask >= hub_bid:
+                    continue
+                try:
+                    sim = simulate(pair, buy_ex, ask, hub, hub_bid, invest, 'AUTO')
+                except Exception:
+                    continue
+                if best is None or sim['net_pct'] > best['net_pct']:
+                    best = sim
+            if best:
+                out.append({
+                    'hub': hub,
+                    'net_pct': best['net_pct'],
+                    'net_usdt': best['net_usdt'],
+                    'buy_exchange': buy_ex,
+                    'network': best['network'],
+                })
+        out.sort(key=lambda r: r['net_pct'], reverse=True)
+        return out
+
+    def demo_status(self, scanner=None):
         now = time.time()
+        hubs = []
+        if scanner is not None:
+            try:
+                hubs = self._hubs_ranking((scanner.snapshot().get('prices') or {}))
+            except Exception:
+                hubs = []
         day = now - 86400
         ttl = float(getattr(config, 'DEMO_REF_TTL_MIN', 30)) * 60
         with self.lock:
@@ -94,6 +200,10 @@ class Executor:
         alvo = float(config.MIN_SPREAD_PCT) + float(getattr(config, 'DEMO_MARGIN_PCT', 0.05))
         if ref:
             alvo = max(alvo, ref[0])
+        if self.using_real_balance:
+            saldo = round(self.real_total_brl, 2)
+        else:
+            saldo = round(float(self.demo_capital), 2)
         return {
             'ops_24h': len(times),
             'max_per_day': config.DEMO_MAX_PER_DAY,
@@ -105,9 +215,19 @@ class Executor:
             'spread_alvo': round(alvo, 4),
             'next_in_min': int(max(0, last + config.DEMO_MIN_INTERVAL_MIN * 60 - now) // 60),
             'routes_waiting': routes,
-            'wallet': w,
-            'start_brl': config.DEMO_START_BRL,
-            'total_brl': round(sum(v.get('BRL', 0) for v in w.values()), 2),
+            'capital': saldo,
+            'home_exchange': self.home_exchange or 'auto',
+            'all_capital': bool(getattr(config, 'DEMO_ALL_CAPITAL', True)),
+            'capital_em_uso': self.capital_in_use,
+            'lucro': round(saldo - float(self.capital_base), 2),
+            'usando_saldo_real': bool(self.using_real_balance),
+            'saldo_real_brl': round(self.real_total_brl, 2),
+            'saldo_real_usdt': round(self.real_total_usdt, 2),
+            'saldos': dict(self.balances_cache) if self.using_real_balance else w,
+            'hubs': hubs,
+            'wallet': {ex: {'BRL': v.get('BRL', 0), 'USDT': v.get('USDT', 0)} for ex, v in w.items()},
+            'start_brl': self.capital_base,
+            'total_brl': round(saldo, 2),
             'total_usdt': round(sum(v.get('USDT', 0) for v in w.values()), 2),
         }
 
@@ -116,6 +236,17 @@ class Executor:
             mode = 'paper'
         self.mode = mode
         print(f"[EXEC] Modo alterado para: {mode}")
+
+    def set_home(self, home):
+        """Define a corretora principal (onde o BRL fica e o lucro volta)."""
+        home = (home or 'auto').strip().lower()
+        self.home_exchange = None if home in ('', 'auto') else home
+        config.HOME_EXCHANGE = self.home_exchange or 'auto'
+        try:
+            db.set_setting('home_exchange', config.HOME_EXCHANGE)
+        except Exception:
+            pass
+        print(f"[EXEC] Corretora principal: {config.HOME_EXCHANGE}")
 
     def _get_exchange(self, eid):
         opts = {
@@ -167,12 +298,21 @@ class Executor:
             with self.lock:
                 if any(t.get('demo') for t in self.pending_transfers):
                     return {'ok': False, 'error': 'demo ja em andamento'}
+            o = dict(o)
+            o['invest_usdt'] = self._demo_size(o)   # juros compostos
             bloqueio = self._demo_blocked_reason(o)
             if bloqueio:
                 return {'ok': False, 'error': bloqueio}
             return self._execute_demo(scanner, o)
         return self.execute(scanner, o['pair'], o['buy_exchange'],
                             o['sell_exchange'], o['invest_usdt'], o['network'])
+
+    def _home_price(self, prices, pair):
+        """Preço de venda (bid) na corretora principal."""
+        if not self.home_exchange:
+            return None
+        p = (prices.get(self.home_exchange) or {}).get(pair)
+        return p if p and p.get('bid') else None
 
     def run_demo_now(self, scanner):
         """Força uma demo agora na melhor rota ao vivo (ignora o spread minimo).
@@ -184,22 +324,33 @@ class Executor:
             pairs.update(m.keys())
         best = None
         for pair in pairs:
+            home = self._home_price(prices, pair)
+            cands = []
             for buy_ex, m1 in prices.items():
-                for sell_ex, m2 in prices.items():
-                    if buy_ex == sell_ex:
+                b = (m1.get(pair) or {}).get('ask')
+                if not b:
+                    continue
+                if self.home_exchange:
+                    if buy_ex == self.home_exchange or not home:
                         continue
-                    b = (m1.get(pair) or {}).get('ask')
-                    s = (m2.get(pair) or {}).get('bid')
-                    if not b or not s or s <= b:
-                        continue
-                    g = (s - b) / b * 100
-                    if not best or g > best['gross_pct']:
-                        best = {'pair': pair, 'buy_exchange': buy_ex,
-                                'sell_exchange': sell_ex, 'gross_pct': g}
+                    g = (home['bid'] - b) / b * 100
+                    cands.append((g, buy_ex, self.home_exchange))
+                else:
+                    for sell_ex, m2 in prices.items():
+                        if sell_ex == buy_ex:
+                            continue
+                        s = (m2.get(pair) or {}).get('bid')
+                        if not s or s <= b:
+                            continue
+                        cands.append(((s - b) / b * 100, buy_ex, sell_ex))
+            for g, buy_ex, sell_ex in cands:
+                if not best or g > best['gross_pct']:
+                    best = {'pair': pair, 'buy_exchange': buy_ex,
+                            'sell_exchange': sell_ex, 'gross_pct': g}
         if not best:
             return {'ok': False, 'error': 'sem preços das corretoras ainda'}
         o = dict(best)
-        o['invest_usdt'] = float(config.INVESTMENT_USDT)
+        o['invest_usdt'] = self._demo_size(o)  # juros compostos: todo o saldo
         o['network'] = 'AUTO'
         o['net_pct'] = round(best['gross_pct'], 4)
         o['net_usdt'] = 0
@@ -230,12 +381,16 @@ class Executor:
         settle = int(chosen_net.get('est_seconds') or getattr(_cfg, 'DEMO_SETTLE_SECONDS', 180))
         settle = max(30, min(settle, 3600))
 
-        # carteira virtual: o dinheiro sai da corretora de compra
+        # capital unico: o dinheiro sai do pool e vira USDT na corretora de compra
         w_buy = self.demo_wallet_for(o['buy_exchange'])
-        if float(w_buy.get('BRL', 0)) < o['invest_usdt']:
-            return {'ok': False, 'error': f"sem BRL na {o['buy_exchange']} (tem {fmt_brl(w_buy.get('BRL', 0))})"}
-        w_buy['BRL'] = round(w_buy['BRL'] - o['invest_usdt'], 2)
+        if float(self.demo_capital) < o['invest_usdt']:
+            return {'ok': False, 'error': f"capital insuficiente: {fmt_brl(self.demo_capital)}"}
+        self.demo_capital = round(self.demo_capital - o['invest_usdt'], 2)
+        self.capital_in_use = {'exchange': o['buy_exchange'], 'amount': o['invest_usdt']}
         w_buy['USDT'] = round(w_buy.get('USDT', 0) + buy_qty, 6)
+        if self.using_real_balance and o['buy_exchange'] in self.balances_cache:
+            self.balances_cache[o['buy_exchange']]['BRL'] = round(
+                max(0.0, self.balances_cache[o['buy_exchange']]['BRL'] - o['invest_usdt']), 2)
 
         with self.lock:
             self._demo_last = started
@@ -250,6 +405,13 @@ class Executor:
         stages = [{'stage': 'compra (demo)', 'exchange': o['buy_exchange'],
                    'price': round(buy_price, 8), 'qty': round(buy_qty, 8),
                    'seconds': 0}]
+        # pernas da rota: o capital sai da casa, compra, viaja e o lucro volta
+        casa = self.home_exchange
+        if casa:
+            stages.insert(0, {'stage': f'capital sai de {casa} (BRL → USDT)',
+                              'exchange': casa, 'amount_brl': o['invest_usdt']})
+        stages.append({'stage': f'USDT viaja {o["buy_exchange"]} → {o["sell_exchange"]}',
+                       'network': sim['network'], 'fee_usd': tx_fee})
         transfer = {
             'id': self.counter + 1,
             'pair': o['pair'],
@@ -304,11 +466,22 @@ class Executor:
         t['stages'].append({'stage': 'venda (demo)', 'exchange': t['sell_exchange'],
                             'price': round(sell_price, 8), 'qty': round(sell_qty, 8),
                             'seconds': round(time.time() - t['started'], 1)})
-        # dinheiro volta (com lucro/prejuizo) para a carteira da corretora de compra
+        casa = self.home_exchange
+        if casa and casa != t['sell_exchange']:
+            t['stages'].append({'stage': f'lucro volta para {casa} (BRL)',
+                                'exchange': casa})
+        # dinheiro volta (com lucro/prejuizo) para o capital que esta girando
         w_buy = self.demo_wallet_for(t['buy_exchange'])
         w_sell = self.demo_wallet_for(t['sell_exchange'])
         w_sell['USDT'] = round(max(0.0, w_sell.get('USDT', 0) - sell_qty), 6)
-        w_buy['BRL'] = round(w_buy.get('BRL', 0) + gross_brl * (1 - sim_fee_sell(t)), 2)
+        volta = gross_brl * (1 - sim_fee_sell(t))
+        self.demo_capital = round(self.demo_capital + volta, 2)
+        self.capital_in_use = None
+        if self.using_real_balance:
+            if t['buy_exchange'] in self.balances_cache:
+                self.balances_cache[t['buy_exchange']]['BRL'] = round(
+                    self.balances_cache[t['buy_exchange']]['BRL'] + volta, 2)
+            self.real_total_brl = round(self.real_total_brl + (volta - invest), 2)
         result = {
             'ok': True, 'id': t['id'], 'mode': 'demo', 'status': 'concluido',
             'pair': t['pair'], 'buy_exchange': t['buy_exchange'],

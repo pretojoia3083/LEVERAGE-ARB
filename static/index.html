@@ -406,14 +406,29 @@
 
       <div class="card p5">
         <div class="card-head noborder">
+          <h2>🏦 Corretora principal</h2>
+          <span class="muted small">onde o seu BRL fica e o lucro volta</span>
+        </div>
+        <div class="spread-manual">
+          <select id="homeSelect" class="input" style="max-width:240px"></select>
+          <button class="btn-save" onclick="saveHome()">💾 Salvar</button>
+          <span class="muted small" id="homeMsg"></span>
+        </div>
+        <div id="hubRank" class="muted small" style="padding:0 20px 18px"></div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
           <h2>💰 Valor por operação (R$)</h2>
           <span class="muted small">com quanto cada arbitragem começa (ex: 5000)</span>
         </div>
         <div class="spread-manual">
           <input type="number" id="demoInvestInput" class="input" value="50" min="10" step="10" placeholder="Ex: 5000">
           <button class="btn-save" onclick="saveDemoInvestment()">💾 Salvar valor</button>
+          <button class="btn-mini" id="allCapitalBtn" onclick="toggleAllCapital()" style="margin-left:8px">💰 Usar todo o saldo</button>
           <span class="muted small" id="demoInvestMsg"></span>
         </div>
+        <div class="muted small" id="compoundHint" style="padding:0 20px 18px"></div>
       </div>
 
       <div class="card p5">
