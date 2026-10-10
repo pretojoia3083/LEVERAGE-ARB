@@ -501,29 +501,72 @@ def _clear_key_db(eid, field):
         pass
 
 
+_key_test_cache = {'quando': 0, 'res': {}}
+
+
+def _testar_chaves():
+    """Autentica de verdade a chave de cada corretora e guarda o resultado
+    por 60s. Sem cache a tela de Configuracao viraria 7 requisicoes
+    autenticadas a cada atualizacao."""
+    import time as _t
+    agora = _t.time()
+    if agora - _key_test_cache['quando'] < 60 and _key_test_cache['res']:
+        return _key_test_cache['res']
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _um(eid):
+        try:
+            return eid, scanner.fetch_balance_one(eid)
+        except Exception as e:
+            return eid, {'error': str(e)[:120]}
+
+    res = {}
+    pool = ThreadPoolExecutor(max_workers=8)
+    try:
+        for eid, r in pool.map(_um, list(EXCHANGE_FIELDS.keys())):
+            res[eid] = r
+    finally:
+        pool.shutdown(wait=False)
+    _key_test_cache['quando'] = agora
+    _key_test_cache['res'] = res
+    return res
+
+
 @app.get("/api/api-status")
 def api_status():
-    """Situacao de cada API: chave, preco publico e saldo autenticado."""
-    import time as _t
+    """Situacao de cada API. Sao TRES coisas diferentes e a tela precisa
+    mostrar as tres, senao parece que tudo esta online quando nao esta:
+      - preco    : dado publico, funciona sem chave nenhuma
+      - chave    : existe alguma chave salva
+      - chave_ok : essa chave actually autentica na corretora
+    Uma chave pode existir e estar errada - so o teste mostra a diferenca."""
     snap = scanner.snapshot()
     prices = snap.get('prices', {}) or {}
     errors = snap.get('errors', {}) or {}
+    testes = _testar_chaves()
     out = {}
     for eid, info in EXCHANGE_FIELDS.items():
         tem_chave = False
+        faltando = []
         for f in info['fields']:
             k = _env_key(eid, f)
             if os.environ.get(k) or db.get_setting(f'key_{k}'):
                 tem_chave = True
-                break
+            else:
+                faltando.append(f)
         p = (prices.get(eid) or {}).get('USDT/BRL')
+        t = testes.get(eid) or {}
+        erro_real = t.get('error', '') or ''
         out[eid] = {
             'label': info['label'],
             'chave': tem_chave,
+            'chave_ok': bool(t.get('ok')),
+            'faltando': faltando,
             'preco': bool(p),
             'ask': p.get('ask') if p else None,
             'bid': p.get('bid') if p else None,
-            'erro': errors.get(eid, ''),
+            'erro': erro_real or errors.get(eid, ''),
         }
     return out
 

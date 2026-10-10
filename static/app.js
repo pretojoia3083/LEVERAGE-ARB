@@ -717,7 +717,11 @@ async function loadApiStatus() {
       : (info.ask ? `ask ${info.ask} · bid ${info.bid}` : (info.erro ? info.erro.slice(0, 60) : '—'));
     return `<tr id="apitest-${eid}">
       <td><b style="color:${EX_COLORS[eid] || 'var(--text)'}">${info.label}</b></td>
-      <td>${info.chave ? '<span class="badge badge-green">✓ tem chave</span>' : '<span class="badge badge-orange">sem chave</span>'}</td>
+      <td>${!info.chave
+          ? '<span class="badge badge-orange">sem chave</span>'
+          : info.chave_ok
+            ? '<span class="badge badge-green">✓ funciona</span>'
+            : '<span class="badge badge-orange">chave recusada</span>'}</td>
       <td>${cPreco}</td>
       <td>${cSaldo}</td>
       <td class="muted small">${cDetalhe}</td>
@@ -1188,9 +1192,18 @@ async function testAllApis() {
   try { status = await api('/api/api-status'); } catch (e) { /* ignora */ }
   const rows = [];
   for (const [eid, info] of Object.entries(status)) {
+    // 3 situacoes distintas: preco (publico), chave existe, chave funciona.
+    // Mostrar so "tem chave" dava a impressao de que tudo estava online.
+    const chaveBadge = !info.chave
+      ? '<span class="badge badge-orange">sem chave</span>'
+      : info.chave_ok
+        ? '<span class="badge badge-green">✓ funciona</span>'
+        : '<span class="badge badge-orange">chave recusada</span>';
+    const motivo = info.erro
+      ? `<div class="muted small" style="max-width:420px;margin-top:4px">${info.erro}</div>` : '';
     rows.push(`<tr id="apitest-${eid}">
       <td><b style="color:${EX_COLORS[eid] || 'var(--text)'}">${info.label}</b></td>
-      <td>${info.chave ? '<span class="badge badge-green">✓ tem chave</span>' : '<span class="badge badge-orange">sem chave</span>'}</td>
+      <td>${chaveBadge}${motivo}</td>
       <td>${info.preco ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-orange">—</span>'}</td>
       <td>—</td><td class="muted small">aguardando…</td>
       <td><button class="btn-mini" onclick="testOneApi('${eid}')">🧪</button></td>
