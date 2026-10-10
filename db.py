@@ -14,6 +14,13 @@ BRT = timezone(timedelta(hours=-3))
 DB_PATH = 'leverage_arb.db'
 db_lock = threading.Lock()
 
+# garante o .env antes de ler as variaveis (independe da ordem de import)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 USE_PG = bool(DATABASE_URL)
 

@@ -107,8 +107,9 @@ class Scanner:
                 import os
                 opts = {
                     'enableRateLimit': True,
-                    'timeout': 60000 if is_cloud else 20000,
-                    'options': {'defaultType': 'spot'},
+                    # timeout curto: falhar rapido e melhor que travar o scan inteiro
+                    'timeout': 8000 if not is_cloud else 15000,
+                    'options': {'defaultType': 'spot', 'recvWindow': 60000},
                 }
                 if eid in ('binance', 'htx'):
                     opts['options']['fetchMarkets'] = ['spot']
@@ -365,13 +366,15 @@ class Scanner:
         items = list(self.exchanges.items())
 
         fut_map = {}
-        pool = ThreadPoolExecutor(max_workers=6)
+        pool = ThreadPoolExecutor(max_workers=8)
+        collected = set()
         try:
             for eid, ex in items:
                 fut_map[pool.submit(_fetch, eid, ex)] = eid
             try:
-                for fut in as_completed(fut_map, timeout=30):
+                for fut in as_completed(fut_map, timeout=45):
                     eid = fut_map[fut]
+                    collected.add(eid)
                     try:
                         _, m, err = fut.result()
                     except Exception:
@@ -384,6 +387,22 @@ class Scanner:
                 pass
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
+
+        # coltagem final:-results que terminaram depois do tempo do as_completed
+        # (sem isso, corretoras rápidas como a Binance se perdem por causa de uma lenta)
+        for fut, eid in fut_map.items():
+            if eid in collected:
+                continue
+            try:
+                if not fut.done(timeout=0.1):
+                    continue
+                _, m, err = fut.result()
+            except Exception:
+                continue
+            if err:
+                self.errors.setdefault(eid, err)
+            elif m:
+                prices[eid] = m
 
         mb = self._fetch_mb()
         if mb:
