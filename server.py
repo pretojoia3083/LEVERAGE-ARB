@@ -121,7 +121,9 @@ class SimRequest(BaseModel):
 
 @app.get("/")
 def home():
-    return FileResponse("static/index.html")
+    # sem cache: HTML antigo no navegador quebrava a tela (mostrava ordens sumidas)
+    return FileResponse("static/index.html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/app.js")

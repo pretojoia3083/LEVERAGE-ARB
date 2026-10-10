@@ -589,9 +589,10 @@ class Executor:
             'elapsed_ms': elapsed_ms, 'elapsed_fmt': f"{elapsed_ms / 1000:.1f}s",
             'est_real_seconds': t['sim']['est_seconds'], 'stages': t['stages'],
         }
+        # saldo final ANTES de gravar (o capital ja inclui o lucro desta ordem)
+        result['saldo_apos'] = round(float(self.demo_capital), 2)
         # ATUALIZA a linha que foi aberta (nao cria outra): evita contar 2x
         db.finish_execution(t.get('id'), result)
-        result['saldo_apos'] = round(float(self.demo_capital), 2)
         with self.lock:
             if t in self.pending_transfers:
                 self.pending_transfers.remove(t)
