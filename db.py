@@ -284,6 +284,21 @@ def add_execution(r):
         return rid
 
 
+def cancel_open_executions():
+    """Ao reiniciar o servidor, ordens que ficaram abertas nao podem ficar
+    'para sempre' no historico. Encerra com lucro 0 (nada foi ganho)."""
+    with db_lock:
+        c = _conn()
+        _exec(c, "UPDATE executions SET done = 1, net_usdt = 0, net_pct = 0 "
+                 "WHERE done = 0")
+        n = c.rowcount
+        c.commit()
+        c.close()
+    if n:
+        print(f"[DB] {n} ordem(ns) aberta(s) encerrada(s) no reinicio")
+    return n
+
+
 def finish_execution(transfer_id, r):
     """Atualiza a ordem ja aberta com o resultado real (nao cria linha nova).
     Sem isso a ordem aberta (lucro simulado) e a concluida (lucro real)

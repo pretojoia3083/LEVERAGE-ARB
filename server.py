@@ -46,6 +46,10 @@ def startup():
             ac = db.get_setting('demo_all_capital')
             if ac is not None:
                 config.DEMO_ALL_CAPITAL = ac == '1'
+            try:
+                db.cancel_open_executions()
+            except Exception as e:
+                print(f"[DB] aviso ao fechar ordens abertas: {str(e)[:60]}")
             _load_keys_from_db()
             at = db.get_setting('auto_trade')
             AUTO_TRADE = (at == '1')
