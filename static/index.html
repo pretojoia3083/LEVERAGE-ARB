@@ -467,6 +467,7 @@
           <h1 class="font-display">📊 Analytics</h1>
           <p class="muted">Resultado acumulado das operações</p>
         </div>
+        <button class="btn-save" onclick="goTab('historico')">📜 Ver histórico completo</button>
       </div>
 
       <div class="grid-3">
@@ -539,16 +540,16 @@
         </div>
       </div>
 
-      <div class="card p5">
-        <div class="card-head noborder">
-          <h2>📜 Simulações detectadas</h2>
-          <span class="muted small">oportunidades encontradas pelo scanner</span>
-        </div>
+      <details class="card p5" style="margin-top:16px">
+        <summary style="cursor:pointer;font-weight:700;font-size:15px">
+          📡 Oportunidades vistas pelo scanner <span class="muted small" id="simCountTag" style="font-weight:400"></span>
+        </summary>
+        <p class="muted small">Isto <b>não</b> são operações do bot — é o scanner apenas registrando que viu o spread. As operações de verdade estão na tabela acima.</p>
         <div class="table-wrap maxh">
           <table class="tbl">
             <thead>
               <tr>
-                <th>Hora</th><th>Tipo</th><th>Ativo</th><th>Rota</th>
+                <th>Hora</th><th>Ativo</th><th>Rota</th>
                 <th>Rede</th><th>Spread</th><th class="right">Investido</th>
                 <th>Tempo est.</th><th class="right">Lucro líq.</th>
               </tr>
@@ -556,7 +557,7 @@
             <tbody id="histBody"></tbody>
           </table>
         </div>
-      </div>
+      </details>
     </section>
 
     <!-- CONFIGURACAO -->

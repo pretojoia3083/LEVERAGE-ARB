@@ -286,11 +286,13 @@ def add_execution(r):
 
 def cancel_open_executions():
     """Ao reiniciar o servidor, ordens que ficaram abertas nao podem ficar
-    'para sempre' no historico. Encerra com lucro 0 (nada foi ganho)."""
+    'para sempre' no historico. Encerra com lucro 0 (nada foi ganho).
+    ok = 0 marca como INTERROMPIDA: nao foi uma operacao que deu errado, foi
+    o servidor reiniciando no meio do caminho."""
     with db_lock:
         c = _conn()
         try:
-            _exec(c, "UPDATE executions SET done = 1, net_usdt = 0, net_pct = 0 "
+            _exec(c, "UPDATE executions SET done = 1, net_usdt = 0, net_pct = 0, ok = 0 "
                      "WHERE done = 0")
             n = c.rowcount
         except Exception:

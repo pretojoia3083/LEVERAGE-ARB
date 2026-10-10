@@ -93,7 +93,7 @@ function fmtTime(sec) {
   return `${Math.floor(sec / 60)}min ${String(sec % 60).padStart(2, '0')}s`;
 }
 
-// data/hora no formato brasileiro (o banco pode devolver UTC ou com fuso)
+// data/hora no horario de Brasil (UTC-3), independente do fuso da maquina
 function fmtTs(ts) {
   if (!ts) return '—';
   try {
@@ -104,9 +104,9 @@ function fmtTs(ts) {
       const m = String(ts).match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
       return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : String(ts).slice(0, 16);
     }
-    const brt = new Date(d.getTime() - (3 * 60 + d.getTimezoneOffset()) * 60000);
+    const brt = new Date(d.getTime() - 3 * 3600 * 1000);
     const p = n => String(n).padStart(2, '0');
-    return `${p(brt.getDate())}/${p(brt.getMonth() + 1)} ${p(brt.getHours())}:${p(brt.getMinutes())}`;
+    return `${p(brt.getUTCDate())}/${p(brt.getUTCMonth() + 1)} ${p(brt.getUTCHours())}:${p(brt.getUTCMinutes())}`;
   } catch (e) {
     return String(ts).slice(0, 16);
   }
@@ -130,6 +130,11 @@ async function api(path, opts) {
   const r = await fetch(path, opts);
   return r.json();
 }
+
+window.goTab = function(nome) {
+  const b = document.querySelector(`[data-tab="${nome}"]`);
+  if (b) b.click();
+};
 
 /* ---------- TABS ---------- */
 document.querySelectorAll('.menu-item').forEach(btn => {
@@ -530,7 +535,6 @@ async function loadHistory() {
   const rows = (hist.data || []).map(h => `
     <tr>
       <td class="muted">${fmtTs(h.ts)}</td>
-      <td><span class="badge ${h.trigger === 'auto' ? 'badge-orange' : 'badge-green'}">${h.trigger}</span></td>
       <td><b>${h.pair}</b></td>
       <td><div class="route-cell">${exBadge(h.buy_exchange)}<span class="arrow">→</span>${exBadge(h.sell_exchange)}</div></td>
       <td>${h.network}</td>
@@ -540,10 +544,21 @@ async function loadHistory() {
       <td class="right"><b class="${h.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(h.net_usdt)}</b></td>
     </tr>`).join('');
   $('histBody').innerHTML = rows ||
-    `<tr><td colspan="9" style="text-align:center;padding:36px" class="muted">Nenhuma simulação registrada ainda.</td></tr>`;
+    `<tr><td colspan="8" style="text-align:center;padding:36px" class="muted">Nenhuma oportunidade registrada ainda.</td></tr>`;
+  const tag = $('simCountTag');
+  if (tag) tag.textContent = `(${(hist.data || []).length} registradas)`;
 
   const lista = EXEC_FILTER === 'all' ? todos : todos.filter(x => x.mode === EXEC_FILTER);
-  const exRows = lista.map(x => `
+  const exRows = lista.map(x => {
+    // ordem aberta = ainda rodando | ok=0 e fechada = servidor reiniciou no meio
+    const aberta = !x.done;
+    const interrompida = x.done && Number(x.ok) === 0;
+    const lucroCelula = aberta
+      ? '<b style="color:#f59e0b">em aberto</b>'
+      : interrompida
+        ? '<span class="muted small">interrompida</span>'
+        : `<b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(x.net_usdt)}</b>`;
+    return `
     <tr>
       <td class="muted">${fmtTs(x.ts)}</td>
       <td><b>${x.pair}</b></td>
@@ -551,9 +566,10 @@ async function loadHistory() {
       <td>${x.network}</td>
       <td><span class="badge ${x.mode === 'demo' ? 'badge-green' : x.mode === 'real' ? 'badge-orange' : ''}">${x.mode}</span></td>
       <td class="right">${fmtBrl(x.invest_usdt)}</td>
-      <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${x.done ? fmtBrl(x.net_usdt) : 'em aberto'}</b></td>
-      <td class="right">${x.saldo_apos ? fmtBrl(x.saldo_apos) : '—'}</td>
-    </tr>`).join('');
+      <td class="right">${lucroCelula}</td>
+      <td class="right">${x.done && x.saldo_apos ? fmtBrl(x.saldo_apos) : '—'}</td>
+    </tr>`;
+  }).join('');
   $('execBody').innerHTML = exRows ||
     `<tr><td colspan="8" style="text-align:center;padding:36px" class="muted">Nenhuma ordem neste filtro.</td></tr>`;
 }
@@ -904,8 +920,12 @@ async function loadDemo() {
       acBtn.className = 'btn-mini' + (on ? ' active-green' : '');
       const ch = $('compoundHint');
       if (ch) {
+        // enquanto o dinheiro esta dentro de uma operacao, capital = 0.
+        // a dica precisa mostrar o total (nao o caixa vazio) para nao assustar
+        const emUso = (st.capital_em_uso && Number(st.capital_em_uso.amount)) || 0;
+        const total = (Number(st.capital) || 0) + emUso;
         ch.textContent = on
-          ? `juros compostos: cada arbitragem usa o saldo inteiro (R$${(st.capital || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) e o lucro entra na próxima`
+          ? `juros compostos: cada arbitragem usa o saldo inteiro (R$${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) e o lucro entra na próxima`
           : `valor fixo de R$${(DASH && DASH.investment) || 0} por operação`;
       }
     }
