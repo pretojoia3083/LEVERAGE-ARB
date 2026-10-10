@@ -114,29 +114,29 @@
 
       <div class="card p5">
         <div class="card-head noborder">
-          <h2>💰 Resultado do bot até agora</h2>
+          <h2>💰 Resultado Arb Diário</h2>
           <span class="muted small" id="sumMode">—</span>
         </div>
         <div class="grid-4">
           <div class="card">
-            <div class="card-label">💵 Saldo do bot (R$)</div>
+            <div class="card-label">💵 Saldo (R$)</div>
             <div class="card-value font-display" id="sumSaldo">—</div>
-            <div class="card-sub muted" id="sumSaldoSub">carteira atual</div>
+          </div>
+          <div class="card">
+            <div class="card-label">📅 Lucro de hoje (R$)</div>
+            <div class="card-value font-display green" id="sumDia">—</div>
           </div>
           <div class="card">
             <div class="card-label">📈 Lucro acumulado (R$)</div>
-            <div class="card-value font-display green" id="sumLucro">—</div>
-            <div class="card-sub muted" id="sumLucroSub">—</div>
+            <div class="card-value font-display green" id="sumAcum">—</div>
           </div>
           <div class="card">
-            <div class="card-label">🔁 Operações</div>
+            <div class="card-label">🔁 Operações hoje</div>
             <div class="card-value font-display" id="sumOps">—</div>
-            <div class="card-sub muted" id="sumOpsSub">—</div>
           </div>
           <div class="card">
-            <div class="card-label">🏅 Melhor operação</div>
+            <div class="card-label">🏅 Melhor hoje (R$)</div>
             <div class="card-value font-display orange" id="sumBest">—</div>
-            <div class="card-sub muted" id="sumBestSub">—</div>
           </div>
         </div>
         <div id="sumWallet" class="balances-grid" style="margin-top:16px"></div>
@@ -422,27 +422,6 @@
           <span class="muted small" id="demoOpInfo"></span>
         </div>
         <div id="demoPending" class="muted">Nenhuma operação demo agora.</div>
-      </div>
-
-      <div class="card p5">
-        <div class="card-head noborder">
-          <h2>🧠 Como o bot decide (regras reais)</h2>
-        </div>
-        <div id="demoRules" class="muted" style="line-height:2;font-size:14px">
-          <b>1.</b> Cada arbitragem leva o tempo real da rota (ex: <b>~3min</b> de transferência). A venda só acontece no fim.<br>
-          <b>2.</b> Terminou? O bot só repete <b>se o spread estiver favorável de novo</b> — nunca em loop automático.<br>
-          <b>3.</b> A mesma rota espera o spread <b>reacender</b> antes de entrar de novo.<br>
-          <b>4.</b> Respeita <b>carteira virtual</b>: sem BRL na corretora, não opera.<br>
-          <b>5.</b> Teto de operações por dia para não inflar resultado.
-        </div>
-      </div>
-
-      <div class="card p5">
-        <div class="card-head noborder">
-          <h2>👛 Carteira virtual da demo</h2>
-          <span class="muted small">o dinheiro se movendo como se fosse real</span>
-        </div>
-        <div id="demoWallet" class="balances-grid"><div class="balance-empty">ligue o BOT Demo para ver</div></div>
       </div>
 
       <div class="card">

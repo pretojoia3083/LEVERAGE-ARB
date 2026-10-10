@@ -349,6 +349,10 @@ def stats():
     s = db.stats(24)
     s['investment'] = config.INVESTMENT_USDT
     s.update(db.execution_stats())
+    try:
+        s['daily'] = db.daily_stats()
+    except Exception as e:
+        s['daily'] = {'erro': str(e)[:120]}
     return s
 
 

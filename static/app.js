@@ -514,11 +514,12 @@ $('btnClear').addEventListener('click', async () => {
 /* ---------- RESUMO DO BOT (Monitor) ---------- */
 function renderSummary(d, st) {
   const mode = (d && d.mode) || 'paper';
-  const invest = (d && d.investment) || 0;
   const byMode = (st && st.by_mode) || {};
+  const daily = (st && st.daily) || {};
+  const dia = daily.dia || { ops: 0, net: 0 };
+  const acum = daily.acumulado || { ops: 0, net: 0 };
   const demo = byMode.demo || { ops: 0, net: 0 };
   const real = byMode.real || { ops: 0, net: 0 };
-  const paper = byMode.paper || { ops: 0, net: 0 };
 
   const modoTxt = $('sumMode');
   if (modoTxt) {
@@ -529,84 +530,54 @@ function renderSummary(d, st) {
         : '📝 PAPER — apenas simulação';
   }
 
-  // lucro: o do modo atual (demo mostra só demo, senão soma executado)
-  const lucro = mode === 'demo' ? demo.net : (real.net + demo.net);
-  const lucroEl = $('sumLucro');
-  if (lucroEl) {
-    lucroEl.textContent = fmtBrl(lucro);
-    lucroEl.className = 'card-value font-display ' + (lucro >= 0 ? 'green' : 'red');
-  }
-  const lsub = $('sumLucroSub');
-  if (lsub) {
-    const parts = [];
-    if (mode === 'demo') parts.push(`${demo.ops} operações demo`);
-    else parts.push(`real ${real.ops} · demo ${demo.ops} · paper ${paper.ops}`);
-    if (invest > 0 && lucro !== 0) parts.push(`${(lucro / (invest * Math.max(demo.ops + real.ops, 1)) * 100).toFixed(3)}% por operação`);
-    lsub.textContent = parts.join(' · ');
-  }
+  // lucro de hoje (zera à meia-noite) e acumulado (nunca zera)
+  const setVal = (id, v, suffix) => {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = fmtBrl(v);
+    el.className = 'card-value font-display ' + (v > 0 ? 'green' : v < 0 ? 'red' : '');
+  };
+  setVal('sumDia', dia.net || 0);
+  setVal('sumAcum', acum.net || 0);
 
-  // saldo
+  // saldo (carteira do bot)
   const saldoEl = $('sumSaldo');
-  const saldoSub = $('sumSaldoSub');
   const wbox = $('sumWallet');
-  if (mode === 'demo' && st && st.wallet) {
-    const w = st.wallet;
+  if (mode === 'demo' && st && st.wallet && Object.keys(st.wallet).length) {
     const totalBrl = st.total_brl || 0;
-    const inicial = st.start_brl || 0;
-    const usados = Object.keys(w).length || 1;
     if (saldoEl) {
       saldoEl.textContent = fmtBrl(totalBrl);
-      saldoEl.className = 'card-value font-display ' + (totalBrl >= inicial * usados ? 'green' : 'orange');
+      saldoEl.className = 'card-value font-display ' + (totalBrl > 0 ? 'green' : '');
     }
-    if (saldoSub) saldoSub.textContent = `${usados} carteiras · started com ${fmtBrl(inicial)} cada`;
     if (wbox) {
-      const chaves = Object.keys(w);
-      wbox.innerHTML = chaves.length ? chaves.map(ex => `
+      wbox.innerHTML = Object.keys(st.wallet).map(ex => `
         <div class="balance-card">
           <div class="balance-card-header">
             <span class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</span>
           </div>
-          <div class="balance-coin"><span class="balance-coin-name">BRL</span><span class="balance-coin-free">${fmtBrl(w[ex].BRL)}</span></div>
-          <div class="balance-coin"><span class="balance-coin-name">USDT</span><span class="balance-coin-free">${(w[ex].USDT || 0).toFixed(2)}</span></div>
-        </div>`).join('') : '<div class="balance-empty">ligue o BOT Demo para ver as carteiras se moverem</div>';
+          <div class="balance-coin"><span class="balance-coin-name">BRL</span><span class="balance-coin-free">${fmtBrl(st.wallet[ex].BRL)}</span></div>
+          <div class="balance-coin"><span class="balance-coin-name">USDT</span><span class="balance-coin-free">${(st.wallet[ex].USDT || 0).toFixed(2)}</span></div>
+        </div>`).join('');
     }
   } else {
     if (saldoEl) { saldoEl.textContent = '—'; saldoEl.className = 'card-value font-display'; }
-    if (saldoSub) saldoSub.textContent = 'disponível no menu Saldo (com API key)';
     if (wbox) wbox.innerHTML = '';
   }
 
   const opsEl = $('sumOps');
-  if (opsEl) {
-    const hoje = st && st.ops_24h !== undefined ? st.ops_24h : null;
-    opsEl.textContent = (mode === 'demo' ? demo.ops : (real.ops + paper.ops)) + (hoje !== null ? ` · ${hoje}/dia` : '');
-  }
-  const opsSub = $('sumOpsSub');
-  if (opsSub) {
-    opsSub.textContent = mode === 'demo'
-      ? (st ? `teto ${st.max_per_day}/dia · intervalo ${st.min_interval_min}min` : '—')
-      : 'paper e real somados';
-  }
+  if (opsEl) opsEl.textContent = dia.ops || 0;
 
   const bEl = $('sumBest');
-  const bSub = $('sumBestSub');
-  const br = st && st.best_route;
-  if (bEl && br) {
-    bEl.textContent = fmtBrl(br.net_usdt);
-    bSub.textContent = `${br.buy_exchange} → ${br.sell_exchange} · ${br.network}`;
-  } else if (bEl) {
-    bEl.textContent = '—';
-    if (bSub) bSub.textContent = 'nenhuma registrada ainda';
-  }
+  if (bEl) bEl.textContent = daily.melhor_hoje ? fmtBrl(daily.melhor_hoje.net_usdt) : '—';
 }
 
 async function loadSummary() {
   try {
     const [st, demo] = await Promise.all([api('/api/stats'), api('/api/demo/status')]);
     const d = DASH || await api('/api/dashboard');
-    renderSummary(d, Object.assign({}, st, { wallet: demo.wallet, total_brl: demo.total_brl,
-      start_brl: demo.start_brl, ops_24h: demo.ops_24h, max_per_day: demo.max_per_day,
-      min_interval_min: demo.min_interval_min }));
+    renderSummary(d, Object.assign({}, st, {
+      wallet: demo.wallet, total_brl: demo.total_brl,
+    }));
   } catch (e) { /* servidor subindo */ }
 }
 

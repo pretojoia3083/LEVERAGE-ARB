@@ -7,6 +7,9 @@
 import json
 import os
 import threading
+from datetime import datetime, timedelta, timezone
+
+BRT = timezone(timedelta(hours=-3))
 
 DB_PATH = 'leverage_arb.db'
 db_lock = threading.Lock()
@@ -273,6 +276,66 @@ def recent_executions(limit=100):
         d['elapsed_fmt'] = f"{(d['elapsed_ms'] or 0) / 1000:.2f}s"
         out.append(d)
     return out
+
+
+def _brt_day(v):
+    """Data (BRT) de um timestamp do banco — SQLite devolve string UTC, PG devolve datetime."""
+    if isinstance(v, datetime):
+        d = v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+        return d.astimezone(BRT).date().isoformat()
+    s = str(v)
+    try:
+        d = datetime.fromisoformat(s.replace('Z', '+00:00').replace(' ', 'T'))
+    except ValueError:
+        return s[:10]
+    if not d.tzinfo:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(BRT).date().isoformat()
+
+
+def daily_stats():
+    """Separa o resultado de HOJE (zera à meia-noite) do ACUMULADO de sempre."""
+    hoje = datetime.now(BRT).date().isoformat()
+    c = _conn()
+    ex_rows = _exec(c, "SELECT ts, net_usdt, mode, buy_exchange, sell_exchange, network "
+                       "FROM executions").fetchall()
+    sim_rows = _exec(c, "SELECT ts, net_usdt, buy_exchange, sell_exchange, network "
+                        "FROM simulations").fetchall()
+    c.close()
+
+    dia = {'ops': 0, 'net': 0.0, 'sims': 0, 'sim_net': 0.0}
+    acum = {'ops': 0, 'net': 0.0, 'sims': 0, 'sim_net': 0.0}
+    best = None
+
+    for r in ex_rows:
+        _, net, mode, buy, sell, net_id = r
+        net = float(net or 0)
+        acum['ops'] += 1
+        acum['net'] += net
+        if _brt_day(r[0]) == hoje:
+            dia['ops'] += 1
+            dia['net'] += net
+            if best is None or net > best[0]:
+                best = (net, buy, sell, net_id)
+
+    for r in sim_rows:
+        _, net, buy, sell, net_id = r
+        net = float(net or 0)
+        acum['sims'] += 1
+        acum['sim_net'] += net
+        if _brt_day(r[0]) == hoje:
+            dia['sims'] += 1
+            dia['sim_net'] += net
+
+    return {
+        'date': hoje,
+        'dia': {k: (round(v, 2) if k.endswith('net') else v) for k, v in dia.items()},
+        'acumulado': {k: (round(v, 2) if k.endswith('net') else v) for k, v in acum.items()},
+        'melhor_hoje': None if not best else {
+            'net_usdt': round(best[0], 2),
+            'buy_exchange': best[1], 'sell_exchange': best[2], 'network': best[3],
+        },
+    }
 
 
 def execution_stats():
