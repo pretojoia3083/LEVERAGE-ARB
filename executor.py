@@ -33,7 +33,11 @@ class Executor:
         # CAPITAL UNICO: comeca em DEMO_START_BRL (R$5.000) e GIRA entre as
         # corretoras — vai para a de compra a cada ciclo e volta (com lucro) no fim.
         self.demo_capital = config.DEMO_START_BRL
-        self.capital_base = config.DEMO_START_BRL  # base para calcular lucro
+        # o capital inicial da demo segue o valor configurado pelo usuario
+        # (evita comecar com 5000 enquanto o campo dice 250)
+        if float(getattr(config, 'DEMO_START_BRL', 0) or 0) <= 0:
+            self.demo_capital = float(config.INVESTMENT_USDT)
+        self.capital_base = self.demo_capital
         self.balances_cache = {}   # saldos REAIS por corretora (quando ha API key)
         self.balances_errors = {}  # motivo de cada falha (aparece na tela)
         self.real_total_brl = 0.0
@@ -106,6 +110,24 @@ class Executor:
 
     def demo_wallet_state(self):
         return {ex: dict(v) for ex, v in self.wallet.items()}
+
+    def set_capital_base(self, valor):
+        """Define o capital inicial da demo (segue o valor configurado)."""
+        try:
+            v = round(float(valor), 2)
+        except Exception:
+            return
+        if v <= 0:
+            return
+        with self.lock:
+            self.capital_base = v
+            if not self.using_real_balance and not self.pending_transfers:
+                self.demo_capital = v
+        try:
+            db.set_setting('demo_start_brl', v)
+        except Exception:
+            pass
+        print(f"[DEMO] capital inicial: {fmt_brl(v)}")
 
     def sync_capital(self):
         """Capital virtual = valor inicial + lucro de hoje.

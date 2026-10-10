@@ -32,12 +32,13 @@ HOME_EXCHANGE = os.environ.get('HOME_EXCHANGE', 'binance').strip().lower()
 # usa TODO o saldo disponivel a cada arbitragem (juros compostos: o lucro entra na proxima)
 DEMO_ALL_CAPITAL = os.environ.get('DEMO_ALL_CAPITAL', '1').strip().lower() in ('1', 'true', 'yes', 'sim')
 
-# Demo: tempo simulado da transferencia antes da venda automatica (segundos).
 # 0 = usa o tempo estimado real da rota (ex: ~3min). Ver executor.py.
 DEMO_SETTLE_SECONDS = 0
 
-# Demo: limites realistas (evitam "arbitragem infinita" que nao existe na vida real)
-DEMO_START_BRL = float(os.environ.get('DEMO_START_BRL', '5000'))      # carteira virtual inicial
+# Demo: capital inicial (0 = usa o "valor por operacao" configurado)
+DEMO_START_BRL = float(os.environ.get('DEMO_START_BRL', '0'))
+
+# Demo: limites realistas (evitam arbitragem infinita que nao existe na vida real)
 DEMO_ROUTE_COOLDOWN_MIN = float(os.environ.get('DEMO_ROUTE_COOLDOWN_MIN', '15'))  # spread precisa reabrir
 DEMO_MIN_INTERVAL_MIN = float(os.environ.get('DEMO_MIN_INTERVAL_MIN', '10'))      # intervalo entre operações
 DEMO_MAX_PER_DAY = int(os.environ.get('DEMO_MAX_PER_DAY', '40'))                   # teto diário

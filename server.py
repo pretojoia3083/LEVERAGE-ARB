@@ -33,6 +33,7 @@ def startup():
             inv = db.get_setting('invest_usdt')
             if inv and float(inv) >= 10:
                 config.INVESTMENT_USDT = float(inv)
+            executor.set_capital_base(config.INVESTMENT_USDT)
             spr = db.get_setting('min_spread')
             if spr is not None and 0 <= float(spr) <= 5:
                 config.MIN_SPREAD_PCT = float(spr)
@@ -198,6 +199,8 @@ def set_investment(req: InvestmentRequest):
         db.set_setting('invest_usdt', v)
     except Exception:
         pass
+    # o valor configurado e tambem o capital inicial da demo
+    executor.set_capital_base(v)
     print(f"[INVEST] agora: {v} USDT")
     return {'ok': True, 'invest_usdt': v}
 
