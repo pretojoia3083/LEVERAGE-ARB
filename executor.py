@@ -6,6 +6,7 @@ import ccxt
 
 import config
 import db
+import json
 from datetime import datetime, timedelta, timezone
 from engine import simulate
 
@@ -45,6 +46,7 @@ class Executor:
         self._demo_last = 0       # ultima operacao demo (timestamp)
         self._demo_times = []     # timestamps das operacoes demo (teto diario)
         self._demo_ref = None     # (spread_pct, timestamp) da ultima operacao
+        self._load_demo_state()    # ritmo continua apos reiniciar o servidor
 
     def refresh_real_balances(self, scanner, min_interval=60):
         """Puxa o saldo REAL das corretoras (via API key) para usar de capital.
@@ -128,6 +130,39 @@ class Executor:
             if cap >= 20:
                 return round(cap, 2)
         return float(o.get('invest_usdt') or config.INVESTMENT_USDT)
+
+    def _save_demo_state(self):
+        """Grava o ritmo da demo no banco: reiniciar o servidor nao pode
+        zerar o intervalo entre operacoes (senao o bot opera colado)."""
+        try:
+            db.set_setting('demo_state', json.dumps({
+                'last': self._demo_last,
+                'times': [round(t, 2) for t in self._demo_times],
+                'routes': {f'{b}|{s}': round(t, 2) for (b, s), t in self._demo_routes.items()},
+                'ref': list(self._demo_ref) if self._demo_ref else None,
+            }))
+        except Exception:
+            pass
+
+    def _load_demo_state(self):
+        try:
+            raw = db.get_setting('demo_state')
+            if not raw:
+                return
+            d = json.loads(raw)
+            self._demo_last = float(d.get('last') or 0)
+            self._demo_times = [float(t) for t in (d.get('times') or [])]
+            self._demo_routes = {}
+            for k, t in (d.get('routes') or {}).items():
+                b, s = k.split('|', 1)
+                self._demo_routes[(b, s)] = float(t)
+            ref = d.get('ref')
+            self._demo_ref = (float(ref[0]), float(ref[1])) if ref else None
+            if self._demo_last:
+                print(f"[DEMO] ritmo restaurado: ultimo ciclo ha "
+                      f"{int((time.time() - self._demo_last) // 60)}min")
+        except Exception as e:
+            print(f"[DEMO] estado nao restaurado: {str(e)[:60]}")
 
     def _demo_blocked_reason(self, o):
         """Travas que impedem arbitragem continua/infinita (igual vida real)."""
@@ -438,6 +473,7 @@ class Executor:
             except Exception:
                 ref = sim['net_pct']
             self._demo_ref = (ref, started)
+            self._save_demo_state()
         stages = [{'stage': 'compra (demo)', 'exchange': o['buy_exchange'],
                    'price': round(buy_price, 8), 'qty': round(buy_qty, 8),
                    'seconds': 0}]
