@@ -256,7 +256,16 @@ def set_all_capital(req: AllCapitalRequest):
 @app.get("/api/demo/status")
 def demo_status():
     try:
-        return executor.demo_status(scanner)
+        s = executor.demo_status(scanner)
+        try:
+            d = db.daily_stats()
+            s['lucro_hoje'] = d['dia']['net']
+            if not s.get('usando_saldo_real'):
+                # saldo da demo = capital inicial + lucro de hoje
+                s['capital_hoje'] = round(float(executor.capital_base) + float(d['dia']['net']), 2)
+        except Exception:
+            pass
+        return s
     except Exception as e:
         return {'erro': str(e)[:150]}
 

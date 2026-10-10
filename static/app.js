@@ -545,7 +545,9 @@ function renderSummary(d, st) {
   const wbox = $('sumWallet');
   const saldos = (st && st.saldos) || null;
   if (saldoEl) {
-    const v = st ? (st.capital ?? st.total_brl ?? 0) : 0;
+    // demo: capital inicial + lucro de hoje | real: saldo real da corretora
+    const v = st ? (st.usando_saldo_real ? (st.capital ?? 0)
+                                        : (st.capital_hoje ?? st.capital ?? 0)) : 0;
     saldoEl.textContent = fmtBrl(v);
     saldoEl.className = 'card-value font-display ' + (v > 0 ? 'green' : '');
   }
@@ -599,9 +601,10 @@ async function loadSummary() {
     const d = DASH || await api('/api/dashboard');
     renderSummary(d, Object.assign({}, st, {
       wallet: demo.wallet, total_brl: demo.total_brl,
-      capital: demo.capital, usando_saldo_real: demo.usando_saldo_real,
+      capital: demo.capital, capital_hoje: demo.capital_hoje,
+      usando_saldo_real: demo.usando_saldo_real,
       saldo_erros: demo.saldo_erros, saldos: demo.saldos,
-      start_brl: demo.start_brl,
+      start_brl: demo.start_brl, lucro_hoje: demo.lucro_hoje,
     }));
   } catch (e) { /* servidor subindo */ }
 }

@@ -6,7 +6,10 @@ import ccxt
 
 import config
 import db
+from datetime import datetime, timedelta, timezone
 from engine import simulate
+
+BRT = timezone(timedelta(hours=-3))
 
 
 def fmt_brl(v):
@@ -187,6 +190,13 @@ class Executor:
 
     def demo_status(self, scanner=None):
         now = time.time()
+        # reset diario do capital virtual: volta ao valor inicial a cada midnight
+        hoje = datetime.now(BRT).date().isoformat()
+        if not self.using_real_balance and getattr(self, '_capital_day', None) != hoje:
+            if getattr(self, '_capital_day', None) is not None:
+                print("[DEMO] novo dia — capital virtual reiniciado")
+            self.demo_capital = float(self.capital_base)
+            self._capital_day = hoje
         hubs = []
         if scanner is not None:
             try:
