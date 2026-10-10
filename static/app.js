@@ -93,6 +93,25 @@ function fmtTime(sec) {
   return `${Math.floor(sec / 60)}min ${String(sec % 60).padStart(2, '0')}s`;
 }
 
+// data/hora no formato brasileiro (o banco pode devolver UTC ou com fuso)
+function fmtTs(ts) {
+  if (!ts) return '—';
+  try {
+    let s = String(ts).replace(' ', 'T');
+    if (s.endsWith('Z')) s = s.slice(0, -1) + '+00:00';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) {
+      const m = String(ts).match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+      return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : String(ts).slice(0, 16);
+    }
+    const brt = new Date(d.getTime() - (3 * 60 + d.getTimezoneOffset()) * 60000);
+    const p = n => String(n).padStart(2, '0');
+    return `${p(brt.getDate())}/${p(brt.getMonth() + 1)} ${p(brt.getHours())}:${p(brt.getMinutes())}`;
+  } catch (e) {
+    return String(ts).slice(0, 16);
+  }
+}
+
 // tempo da execução: em paper/demo a operação é instantânea,
 // então mostra o tempo estimado de verdade (com a transferência)
 function xTime(x) {
@@ -459,10 +478,43 @@ window.execRoute = async function (pair, buyEx, sellEx) {
 };
 
 /* ---------- HISTÓRICO ---------- */
+let EXEC_FILTER = 'all';
+
+window.filterExecs = function(modo) {
+  EXEC_FILTER = modo;
+  document.querySelectorAll('#execFilters .spread-pill').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim().toLowerCase() === (modo === 'all' ? 'todas' : modo)));
+  loadHistory();
+};
+
 async function loadHistory() {
   const [hist, stats, execs] = await Promise.all([
-    api('/api/simulations?limit=200'), api('/api/stats'), api('/api/executions?limit=100'),
+    api('/api/simulations?limit=200'), api('/api/stats'), api('/api/executions?limit=200'),
   ]);
+  const todos = execs.data || [];
+
+  // resumo das ordens (todas, sem filtro)
+  const lucroOrdens = todos.reduce((s, x) => s + (Number(x.net_usdt) || 0), 0);
+  const melhor = todos.reduce((a, b) =>
+    ((Number(b.net_usdt) || 0) > (Number(a && a.net_usdt) || 0) ? b : a), null);
+  const cnt = $('histExecCount');
+  if (cnt) cnt.textContent = todos.length;
+  const cp = $('histExecProfit');
+  if (cp) {
+    cp.textContent = fmtBrl(lucroOrdens);
+    cp.className = 'card-value font-display ' + (lucroOrdens >= 0 ? 'green' : 'red');
+  }
+  const cs = $('histSimCount');
+  if (cs) cs.textContent = stats.total_simulations ?? 0;
+  const be = $('histBestExec');
+  if (be) be.textContent = melhor ? fmtBrl(melhor.net_usdt) : '—';
+
+  const mc = $('histModeCount');
+  if (mc) {
+    const n = m => todos.filter(x => x.mode === m).length;
+    mc.textContent = `${n('demo')} demo · ${n('real')} real · ${n('paper')} paper`;
+  }
+
   $('hsCount').textContent = (stats.total_simulations ?? 0) + (stats.total_executions ?? 0);
   $('hsTotal').textContent = fmtBrl((stats.total_net_usdt ?? 0) + (stats.total_executed_net ?? 0));
   $('stSims').textContent = stats.total_simulations ?? 0;
@@ -471,13 +523,13 @@ async function loadHistory() {
   $('stAvg').textContent = `${stats.avg_net_pct ?? 0}% média por operação`;
   const br = stats.best_route;
   if (br) {
-    $('hsBest').textContent = `${br.pair} +$${br.net_usdt}`;
+    $('hsBest').textContent = `${br.pair} ${fmtBrl(br.net_usdt)}`;
     $('hsBestSub').textContent = `${br.buy_exchange} → ${br.sell_exchange} via ${br.network}`;
   }
 
   const rows = (hist.data || []).map(h => `
     <tr>
-      <td class="muted">${h.ts ? h.ts.replace('T', ' ').slice(5, 16) : ''}</td>
+      <td class="muted">${fmtTs(h.ts)}</td>
       <td><span class="badge ${h.trigger === 'auto' ? 'badge-orange' : 'badge-green'}">${h.trigger}</span></td>
       <td><b>${h.pair}</b></td>
       <td><div class="route-cell">${exBadge(h.buy_exchange)}<span class="arrow">→</span>${exBadge(h.sell_exchange)}</div></td>
@@ -488,21 +540,22 @@ async function loadHistory() {
       <td class="right"><b class="${h.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(h.net_usdt)}</b></td>
     </tr>`).join('');
   $('histBody').innerHTML = rows ||
-    `<tr><td colspan="9" style="text-align:center;padding:36px" class="muted">Nenhuma operação registrada ainda. O sistema registra automaticamente oportunidades ≥ 0.10% de lucro líquido.</td></tr>`;
+    `<tr><td colspan="9" style="text-align:center;padding:36px" class="muted">Nenhuma simulação registrada ainda.</td></tr>`;
 
-  const exRows = (execs.data || []).map(x => `
+  const lista = EXEC_FILTER === 'all' ? todos : todos.filter(x => x.mode === EXEC_FILTER);
+  const exRows = lista.map(x => `
     <tr>
-      <td class="muted">${x.ts ? x.ts.replace('T', ' ').slice(5, 16) : ''}</td>
+      <td class="muted">${fmtTs(x.ts)}</td>
       <td><b>${x.pair}</b></td>
       <td><div class="route-cell">${exBadge(x.buy_exchange)}<span class="arrow">→</span>${exBadge(x.sell_exchange)}</div></td>
       <td>${x.network}</td>
-      <td><span class="badge badge-orange">${x.mode}</span></td>
-      <td>${fmtBrl(x.invest_usdt)}</td>
-      <td>${xTime(x)}</td>
+      <td><span class="badge ${x.mode === 'demo' ? 'badge-green' : x.mode === 'real' ? 'badge-orange' : ''}">${x.mode}</span></td>
+      <td class="right">${fmtBrl(x.invest_usdt)}</td>
       <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(x.net_usdt)}</b></td>
+      <td class="right">${x.net_pct}%</td>
     </tr>`).join('');
   $('execBody').innerHTML = exRows ||
-    `<tr><td colspan="8" style="text-align:center;padding:36px" class="muted">Nenhuma execução ainda — clique em ⚡ Executar numa oportunidade.</td></tr>`;
+    `<tr><td colspan="8" style="text-align:center;padding:36px" class="muted">Nenhuma ordem neste filtro.</td></tr>`;
 }
 
 $('btnClear').addEventListener('click', async () => {
@@ -889,7 +942,7 @@ async function loadDemo() {
     const demos = (ex.data || []).filter(x => x.mode === 'demo');
     $('demoExecBody').innerHTML = demos.map(x => `
       <tr>
-        <td class="muted">${x.ts ? x.ts.replace('T', ' ').slice(5, 16) : ''}</td>
+        <td class="muted">${fmtTs(x.ts)}</td>
         <td><div class="route-cell">${exBadge(x.buy_exchange)}<span class="arrow">→</span>${exBadge(x.sell_exchange)}</div></td>
         <td>${x.network}</td>
         <td>${fmtBrl(x.invest_usdt)}</td>

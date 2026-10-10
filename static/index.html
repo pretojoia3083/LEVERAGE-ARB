@@ -476,7 +476,7 @@
         </div>
         <div class="card p5">
           <div class="card-label">Lucro total simulado</div>
-          <div class="card-value font-display green" id="hsTotal">$0.00</div>
+          <div class="card-value font-display green" id="hsTotal">R$0,00</div>
         </div>
         <div class="card p5">
           <div class="card-label">Melhor rota 24h</div>
@@ -491,42 +491,69 @@
       <div class="page-head">
         <div>
           <h1 class="font-display">📜 Histórico</h1>
-          <p class="muted">Todas as operações simuladas e executadas</p>
+          <p class="muted">Todas as ordens executadas e simulações detectadas</p>
         </div>
         <button class="btn-danger" id="btnClear">Limpar histórico</button>
       </div>
 
-      <div class="card">
-        <div class="card-head">
-          <h2>📜 Histórico</h2>
-          <span class="muted small">Simulações automáticas + execuções do botão</span>
+      <div class="grid-4">
+        <div class="card p5">
+          <div class="card-label">Ordens executadas</div>
+          <div class="card-value font-display" id="histExecCount">0</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">Lucro das ordens (R$)</div>
+          <div class="card-value font-display green" id="histExecProfit">R$0,00</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">Simulações registradas</div>
+          <div class="card-value font-display" id="histSimCount">0</div>
+        </div>
+        <div class="card p5">
+          <div class="card-label">Melhor ordem</div>
+          <div class="card-value font-display orange" id="histBestExec">—</div>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>⚡ Ordens executadas</h2>
+          <span class="muted small" id="histModeCount"></span>
+          <div style="margin-left:auto;display:flex;gap:8px" id="execFilters">
+            <button class="spread-pill active" onclick="filterExecs('all')">Todas</button>
+            <button class="spread-pill" onclick="filterExecs('demo')">Demo</button>
+            <button class="spread-pill" onclick="filterExecs('real')">Real</button>
+            <button class="spread-pill" onclick="filterExecs('paper')">Paper</button>
+          </div>
+        </div>
+        <div class="table-wrap maxh">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Hora</th><th>Ativo</th><th>Rota</th><th>Rede</th>
+                <th>Modo</th><th class="right">Investido</th><th class="right">Lucro líq.</th><th class="right">%</th>
+              </tr>
+            </thead>
+            <tbody id="execBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>📜 Simulações detectadas</h2>
+          <span class="muted small">oportunidades encontradas pelo scanner</span>
         </div>
         <div class="table-wrap maxh">
           <table class="tbl">
             <thead>
               <tr>
                 <th>Hora</th><th>Tipo</th><th>Ativo</th><th>Rota</th>
-                <th>Rede</th><th>Spread</th><th>Investido</th>
+                <th>Rede</th><th>Spread</th><th class="right">Investido</th>
                 <th>Tempo est.</th><th class="right">Lucro líq.</th>
               </tr>
             </thead>
             <tbody id="histBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h2>⚡ Execuções realizadas</h2><span class="muted small">tempo real medido de cada operação</span></div>
-        <div class="table-wrap maxh">
-          <table class="tbl">
-            <thead>
-              <tr>
-                <th>Hora</th><th>Ativo</th><th>Rota</th><th>Rede</th>
-                <th>Modo</th><th>Investido</th>
-                <th>Tempo real</th><th class="right">Lucro líq.</th>
-              </tr>
-            </thead>
-            <tbody id="execBody"></tbody>
           </table>
         </div>
       </div>
