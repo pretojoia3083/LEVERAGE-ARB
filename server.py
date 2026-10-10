@@ -455,9 +455,8 @@ EXCHANGE_FIELDS = {
     'okx':      {'label': 'OKX',      'fields': ['API_KEY', 'SECRET_KEY', 'PASSPHRASE']},
     'bybit':    {'label': 'Bybit',    'fields': ['API_KEY', 'SECRET_KEY']},
     'mexc':     {'label': 'MEXC',     'fields': ['API_KEY', 'SECRET_KEY']},
-    'kucoin':   {'label': 'KuCoin',   'fields': ['API_KEY', 'SECRET_KEY', 'PASSPHRASE']},
-    'gate':     {'label': 'Gate.io',  'fields': ['API_KEY', 'SECRET_KEY']},
     'mercadobitcoin': {'label': 'MercadoBitcoin', 'fields': ['API_KEY', 'SECRET_KEY']},
+    'bitso':    {'label': 'Bitso',    'fields': ['API_KEY', 'SECRET_KEY']},
 }
 
 

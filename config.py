@@ -53,26 +53,28 @@ NETWORK_PRIORITY = ['BEP20', 'POLYGON', 'ARBITRUM', 'SOL', 'TRC20', 'ERC20']
 
 IS_CLOUD = os.environ.get('RENDER') is not None
 
+# ==========================================================
+# Corretoras que entram no scanner.
+# REMOVIDAS de proposito (nao produzem preco usavel):
+#   - gate.io   so tem USDBRL/USDT (stablecoin, nao e BRL real)
+#   - kucoin    nao tem nenhum par com BRL
+#   - kraken    so tem BRL1/USD (sem USDT)
+#   - htx       par aparece no catalogo mas a API responde
+#               "invalid-parameter" (nao e negociavel) e a
+#               corretora tem historico de problema regulatorio
+# Para devolver uma, so acrescentar o nome aqui E em server.py (EXCHANGE_FIELDS).
+# ==========================================================
 EXCHANGES = [
-    'binance', 'bybit', 'bitget', 'okx', 'gate', 'mexc',
-    'kucoin', 'kraken',
-] if IS_CLOUD else [
-    'binance', 'bybit', 'bitget', 'kucoin',
-    'okx', 'gate', 'mexc', 'htx', 'kraken',
-    'mercadobitcoin',
-    'bitso',
+    'binance', 'bybit', 'bitget', 'okx', 'mexc',
+    'mercadobitcoin', 'bitso',
 ]
 
 TAKER_FEES = {
     'binance': 0.0010,
     'bybit':   0.0010,
     'bitget':  0.0010,
-    'kucoin':  0.0010,
     'okx':     0.0010,
-    'gate':    0.0009,
     'mexc':    0.0005,
-    'htx':     0.0020,
-    'kraken':  0.0026,
     'mercadobitcoin': 0.0050,
     'bitso': 0.0050,
 }

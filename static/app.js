@@ -211,21 +211,26 @@ function renderPrices(prices, opps, exchangesOk) {
     activeExs.add(o.sell_exchange);
   });
 
-  const ALL_EX = ['binance', 'bybit', 'bitget', 'okx', 'gate', 'mexc', 'kucoin', 'kraken', 'mercadobitcoin'];
+  // a lista vem do servidor (config.py): corretora removida la some aqui
+  // automaticamente, sem precisar mexer em dois lugares
+  const PREFERIDAS = ['binance', 'bybit', 'bitget', 'okx', 'mexc', 'mercadobitcoin', 'bitso'];
+  const doServidor = Object.keys(prices || {});
+  const ALL_EX = PREFERIDAS.filter(e => doServidor.includes(e))
+    .concat(doServidor.filter(e => !PREFERIDAS.includes(e)));
   grid.innerHTML = ALL_EX.map(ex => {
     const isConnected = (exchangesOk || []).includes(ex) || ex === 'mercadobitcoin';
     const data = prices && prices[ex];
     const pair = data && data['USDT/BRL'];
     const isActive = activeExs.has(ex);
-    const isMB = ex === 'mercadobitcoin';
 
     if (!pair || !pair.ask) {
-      const noPair = !isConnected && /gate|kucoin|kraken/i.test(ex);
       return `<div class="price-card${isConnected ? '' : ' offline'}">
         <div class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</div>
-        <div class="price-ask muted">${noPair ? 'sem par BRL' : (isConnected ? 'aguardando...' : 'offline')}</div>
+        <div class="price-ask muted">${isConnected ? 'aguardando...' : 'offline'}</div>
       </div>`;
     }
+    const invertido = pair.invertido
+      ? `<div class="price-vol">cotado como ${pair.invertido}</div>` : '';
     const spread = pair.ask && pair.bid ? (((pair.ask - pair.bid) / pair.bid) * 100).toFixed(3) : '—';
     const vol = pair.volume ? `<div class="price-vol">vol 24h $${Number(pair.volume).toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>` : '';
     return `<div class="price-card${isActive ? ' active' : ''}">
@@ -233,7 +238,7 @@ function renderPrices(prices, opps, exchangesOk) {
       <div class="price-ask">ask ${fmtPrice(pair.ask)}</div>
       <div class="price-bid">bid ${fmtPrice(pair.bid)}</div>
       <div class="price-spread">spread ${spread}%</div>
-      ${vol}
+      ${vol}${invertido}
       ${isActive ? '<div class="price-tag">OPORTUNIDADE</div>' : ''}
     </div>`;
   }).join('');
@@ -1048,19 +1053,20 @@ async function loadDex() {
 }
 
 /* ---------- CONFIGURACAO ---------- */
+// espelha config.EXCHANGES: Gate/KuCoin/Kraken/HTX sairam por nao
+// entregar USDT/BRL usavel
 const EX_LABELS = {
   binance: 'Binance', bybit: 'Bybit', bitget: 'Bitget', okx: 'OKX',
-  gate: 'Gate.io', mexc: 'MEXC', kucoin: 'KuCoin', mercadobitcoin: 'MercadoBitcoin',
+  mexc: 'MEXC', mercadobitcoin: 'MercadoBitcoin', bitso: 'Bitso',
 };
 const EX_FIELDS = {
   binance: ['API_KEY', 'SECRET_KEY'],
   bybit: ['API_KEY', 'SECRET_KEY'],
   bitget: ['API_KEY', 'SECRET_KEY', 'PASSPHRASE'],
   okx: ['API_KEY', 'SECRET_KEY', 'PASSPHRASE'],
-  gate: ['API_KEY', 'SECRET_KEY'],
   mexc: ['API_KEY', 'SECRET_KEY'],
-  kucoin: ['API_KEY', 'SECRET_KEY', 'PASSPHRASE'],
   mercadobitcoin: ['API_KEY', 'SECRET_KEY'],
+  bitso: ['API_KEY', 'SECRET_KEY'],
 };
 
 function maskKey(val) {

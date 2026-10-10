@@ -112,7 +112,7 @@ class Scanner:
                     'timeout': 30000 if not is_cloud else 60000,
                     'options': {'defaultType': 'spot', 'recvWindow': 60000},
                 }
-                if eid in ('binance', 'htx'):
+                if eid == 'binance':
                     opts['options']['fetchMarkets'] = ['spot']
 
                 env_key = f'{eid.upper()}_API_KEY'
@@ -138,9 +138,33 @@ class Scanner:
                         ex.markets = {pair: {'id': 'USDTBRL', 'symbol': pair, 'base': 'USDT', 'quote': 'BRL', 'active': True, 'type': 'spot'}}
                         ex.markets_by_id = {'USDTBRL': ex.markets[pair]}
                 else:
-                    ex.load_markets()
+                    try:
+                        ex.load_markets()
+                    except Exception as e:
+                        # A MEXC (e outras) rejeita o catalogo inteiro quando a
+                        # chave esta errada: "API-key format invalid". Mas para
+                        # PRECO PUBLICO a chave nao e necessaria. Recarrega sem
+                        # credencial e devolve a chave depois - assim o scanner
+                        # volta a funcionar e o erro real aparece so na hora de
+                        # consultar saldo/negociar, que e onde a chave importa.
+                        if not api_key:
+                            raise
+                        print(f"[LEVERAGE ARB] {eid} recusou a chave ao carregar "
+                              f"({str(e)[:60]}) - tentando so preco publico")
+                        sem_chave = getattr(ccxt, eid)({
+                            k: v for k, v in opts.items()
+                            if k not in ('apiKey', 'secret', 'password')})
+                        sem_chave.load_markets()
+                        sem_chave.apiKey = api_key
+                        sem_chave.secret = secret
+                        if passphrase:
+                            sem_chave.password = passphrase
+                        ex = sem_chave
                 return eid, ex
-            except Exception:
+            except Exception as e:
+                # falha silenciosa aqui deixa a corretora sumir da tela sem
+                # explicar o motivo - o log e a unica pista que existe
+                print(f"[LEVERAGE ARB] {eid} nao carregou: {str(e)[:110]}")
                 return eid, None
 
         loaded = {}
@@ -360,6 +384,21 @@ class Scanner:
                         m[pair] = {'ask': t['ask'], 'bid': t['bid'], 'volume': vol}
                 except Exception:
                     pass
+                # A mesma moeda pode vir publicationada ao contrario: varias
+                # corretoras listam BRL/USDT em vez de USDT/BRL. E o mesmo
+                # mercado, so invertido — entao invertemos o preco em vez de
+                # descartar a corretora.
+                if pair not in m:
+                    inverso = '/'.join(reversed(pair.split('/')))  # USDT/BRL -> BRL/USDT
+                    try:
+                        t = ex.fetch_ticker(inverso)
+                        if t and t.get('ask') and t.get('bid') and t['ask'] > 0 and t['bid'] > 0:
+                            m[pair] = {'ask': 1.0 / t['bid'],      # compro USDT pago o bid do BRL
+                                       'bid': 1.0 / t['ask'],
+                                       'volume': 0,
+                                       'invertido': inverso}
+                    except Exception:
+                        pass
             if not m:
                 direct = self._fetch_direct(eid, ex)
                 if direct:
