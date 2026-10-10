@@ -137,7 +137,12 @@ class Executor:
             return
         try:
             d = db.daily_stats(mode='demo')
+            antigo = self.demo_capital
             self.demo_capital = round(float(self.capital_base) + float(d['dia']['net']), 2)
+            if abs(self.demo_capital - antigo) > 0.01:
+                # deixa claro no log que o lucro acumulado foi recuperado
+                print(f"[DEMO] capital restaurado: {fmt_brl(antigo)} -> "
+                      f"{fmt_brl(self.demo_capital)} (lucro de hoje)")
         except Exception:
             pass
 
