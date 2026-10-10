@@ -45,6 +45,7 @@ def startup():
             ac = db.get_setting('demo_all_capital')
             if ac is not None:
                 config.DEMO_ALL_CAPITAL = ac == '1'
+            _load_keys_from_db()
             at = db.get_setting('auto_trade')
             AUTO_TRADE = (at == '1')
             print(f"[LEVERAGE ARB] config salva: invest R${config.INVESTMENT_USDT} · spread {config.MIN_SPREAD_PCT}% · modo {executor.mode} · auto {'ON' if AUTO_TRADE else 'OFF'}")
@@ -95,8 +96,8 @@ def startup():
 
                 if executor.mode in ('real', 'demo') or executor.get_pending():
                     executor.check_deposits(scanner)
-                if executor.mode == 'demo':
-                    executor.refresh_real_balances(scanner)
+                # saldo real sempre (throttled ~1min dentro do refresh)
+                executor.refresh_real_balances(scanner)
             except Exception as e:
                 print(f"[ERRO] scan: {e}")
             time.sleep(config.SCAN_INTERVAL)
@@ -336,6 +337,15 @@ def get_pending():
     return {'data': executor.get_pending()}
 
 
+@app.post("/api/balances/refresh")
+def refresh_balances():
+    executor._last_bal = 0  # força
+    executor.refresh_real_balances(scanner, min_interval=0)
+    return {'ok': True, 'capital': executor.demo_capital,
+            'saldos': executor.balances_cache,
+            'erros': getattr(executor, 'balances_errors', {})}
+
+
 @app.get("/api/balances")
 def get_balances():
     try:
@@ -433,6 +443,43 @@ def _env_key(eid, field):
     return f'{eid.upper()}_{field}'
 
 
+def _load_keys_from_db():
+    """Recupera as chaves salvas pela tela de Configuracao.
+    Sem isso, a key salva no .env local se perde no Render (disco efemero)."""
+    try:
+        prefix = '_'.join(sorted(EXCHANGE_FIELDS.keys()))  # apenas para manter ordem estável
+    except Exception:
+        prefix = ''
+    carregadas = []
+    for eid, info in EXCHANGE_FIELDS.items():
+        for f in info['fields']:
+            key = _env_key(eid, f)
+            if os.environ.get(key):
+                continue
+            val = db.get_setting(f'key_{key}')
+            if val:
+                os.environ[key] = val
+                carregadas.append(key)
+    if carregadas:
+        print(f"[CONFIG] chaves carregadas do banco: {', '.join(carregadas)}")
+    return carregadas
+
+
+def _save_key_db(eid, field, value):
+    db.set_setting(f'key_{_env_key(eid, field)}', value)
+
+
+def _clear_key_db(eid, field):
+    try:
+        c = db._conn()
+        sql = "DELETE FROM app_settings WHERE key = ?" if db.USE_PG else "DELETE FROM app_settings WHERE key = ?"
+        c.execute(sql, (f'key_{_env_key(eid, field)}',))
+        c.commit()
+        c.close()
+    except Exception:
+        pass
+
+
 @app.get("/api/settings")
 def get_settings():
     result = {}
@@ -440,6 +487,8 @@ def get_settings():
         result[eid] = {'label': info['label'], 'configured': False, 'fields': {}}
         for f in info['fields']:
             val = os.environ.get(_env_key(eid, f), '')
+            if not val:
+                val = db.get_setting(f'key_{_env_key(eid, f)}') or ''
             result[eid]['fields'][f] = val
             if val:
                 result[eid]['configured'] = True
@@ -475,11 +524,17 @@ def save_settings(req: SettingsRequest):
         if not found:
             lines.append(env_line)
         os.environ[key] = value
+        _save_key_db(eid, field, value)
 
     with open(env_path, 'w', encoding='utf-8') as f:
         f.writelines(lines)
 
-    return {'ok': True, 'exchange': eid, 'message': f'{EXCHANGE_FIELDS[eid]["label"]} salva! Reinicie para conectar.'}
+    try:
+        scanner.load_exchanges()
+    except Exception:
+        pass
+
+    return {'ok': True, 'exchange': eid, 'message': f'{EXCHANGE_FIELDS[eid]["label"]} salva e conectada!'}
 
 
 @app.delete("/api/settings")
@@ -510,6 +565,7 @@ def clear_settings(exchange: str):
     for f in EXCHANGE_FIELDS[eid]['fields']:
         key = _env_key(eid, f)
         os.environ.pop(key, None)
+        _clear_key_db(eid, f)
 
     return {'ok': True}
 

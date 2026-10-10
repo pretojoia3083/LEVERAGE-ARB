@@ -31,6 +31,7 @@ class Executor:
         self.demo_capital = config.DEMO_START_BRL
         self.capital_base = config.DEMO_START_BRL  # base para calcular lucro
         self.balances_cache = {}   # saldos REAIS por corretora (quando ha API key)
+        self.balances_errors = {}  # motivo de cada falha (aparece na tela)
         self.real_total_brl = 0.0
         self.real_total_usdt = 0.0
         self.using_real_balance = False
@@ -55,10 +56,14 @@ class Executor:
             print(f"[EXEC] ⚠️ saldo indisponivel: {str(e)[:80]}")
             return self.balances_cache
         cache = {}
+        erros = {}
         total_brl = 0.0
         total_usdt = 0.0
         for ex, info in (b or {}).items():
-            if not isinstance(info, dict) or info.get('error'):
+            if not isinstance(info, dict):
+                continue
+            if info.get('error'):
+                erros[ex] = str(info['error'])[:80]
                 continue
             coins = info.get('coins') or {}
             brl = float((coins.get('BRL') or {}).get('total') or 0)
@@ -67,7 +72,10 @@ class Executor:
                 cache[ex] = {'BRL': brl, 'USDT': usdt}
                 total_brl += brl
                 total_usdt += usdt
+            else:
+                erros[ex] = 'saldo zero'
         self.balances_cache = cache
+        self.balances_errors = erros
         self.real_total_brl = round(total_brl, 2)
         self.real_total_usdt = round(total_usdt, 2)
         if total_brl > 0:
@@ -224,6 +232,7 @@ class Executor:
             'saldo_real_brl': round(self.real_total_brl, 2),
             'saldo_real_usdt': round(self.real_total_usdt, 2),
             'saldos': dict(self.balances_cache) if self.using_real_balance else w,
+            'saldo_erros': dict(getattr(self, 'balances_errors', {})),
             'hubs': hubs,
             'wallet': {ex: {'BRL': v.get('BRL', 0), 'USDT': v.get('USDT', 0)} for ex, v in w.items()},
             'start_brl': self.capital_base,

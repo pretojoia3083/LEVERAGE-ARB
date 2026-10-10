@@ -563,6 +563,20 @@ function renderSummary(d, st) {
       </div>`).join('') : '<div class="balance-empty">configure a API key de uma corretora para o bot usar seu saldo real</div>';
   }
 
+  // aviso honesto quando o saldo real nao veio
+  const warn = $('sumWarn');
+  if (warn) {
+    const erros = st && st.saldo_erros ? st.saldo_erros : {};
+    if (st && !st.usando_saldo_real) {
+      const chaves = Object.keys(erros);
+      warn.innerHTML = `⚠️ <b>Saldo real não disponível</b> — usando capital virtual de R$${(st.start_brl || 0).toLocaleString('pt-BR')}. `
+        + (chaves.length ? `Motivo: ${chaves.slice(0, 3).map(k => `<b>${k}</b> (${(erros[k] || '').slice(0, 40)})`).join(' · ')}`
+                          : 'configure a API key no menu Configuração.');
+    } else {
+      warn.innerHTML = '';
+    }
+  }
+
   const opsEl = $('sumOps');
   if (opsEl) opsEl.textContent = dia.ops || 0;
 
@@ -570,12 +584,24 @@ function renderSummary(d, st) {
   if (bEl) bEl.textContent = daily.melhor_hoje ? fmtBrl(daily.melhor_hoje.net_usdt) : '—';
 }
 
+window.refreshSaldos = async function() {
+  const btn = $('sumWarn');
+  if (btn) btn.textContent = '⏳ puxando saldo das corretoras...';
+  try {
+    await api('/api/balances/refresh', { method: 'POST' });
+  } catch (e) { /* ignora */ }
+  loadSummary();
+};
+
 async function loadSummary() {
   try {
     const [st, demo] = await Promise.all([api('/api/stats'), api('/api/demo/status')]);
     const d = DASH || await api('/api/dashboard');
     renderSummary(d, Object.assign({}, st, {
       wallet: demo.wallet, total_brl: demo.total_brl,
+      capital: demo.capital, usando_saldo_real: demo.usando_saldo_real,
+      saldo_erros: demo.saldo_erros, saldos: demo.saldos,
+      start_brl: demo.start_brl,
     }));
   } catch (e) { /* servidor subindo */ }
 }
