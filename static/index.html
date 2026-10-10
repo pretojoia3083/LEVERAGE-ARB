@@ -565,6 +565,27 @@
         </div>
         <div id="settingsStatus" class="settings-status"></div>
       </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>🔌 Teste de API</h2>
+          <span class="muted small">confere se a chave está valendo de verdade</span>
+          <button class="btn-save" style="margin-left:auto" onclick="testAllApis()">🧪 Testar todas</button>
+        </div>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Corretora</th><th>Chave</th><th>Preço</th>
+                <th>Saldo</th><th>Detalhe</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="apiTestBody">
+              <tr><td colspan="6" class="muted" style="text-align:center;padding:20px">clique em “Testar todas”</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <div id="execToast" class="exec-toast"></div>

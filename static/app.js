@@ -124,7 +124,7 @@ document.querySelectorAll('.menu-item').forEach(btn => {
     if (btn.dataset.tab === 'oportunidades') loadDex();
     if (btn.dataset.tab === 'demobot') loadDemo();
     if (btn.dataset.tab === 'monitor') loadSummary();
-    if (btn.dataset.tab === 'configuracao') { loadSettings(); }
+    if (btn.dataset.tab === 'configuracao') { loadSettings(); loadApiStatus(); }
   });
 });
 
@@ -616,7 +616,35 @@ setInterval(() => {
   if ($('tab-historico').classList.contains('active')) loadHistory();
   if ($('tab-demobot').classList.contains('active')) loadDemo();
   if ($('tab-monitor').classList.contains('active')) loadSummary();
+  if ($('tab-configuracao').classList.contains('active')) loadApiStatus();
 }, 8000);
+
+/* ---------- STATUS DAS APIS (atualiza sozinho) ---------- */
+async function loadApiStatus() {
+  const body = $('apiTestBody');
+  if (!body) return;
+  let status = {};
+  try { status = await api('/api/api-status'); } catch (e) { return; }
+  const temTeste = body.querySelector('tr[id^="apitest-"]');
+  const linhas = Object.entries(status).map(([eid, info]) => {
+    const tested = $(`apitest-${eid}`);
+    const cPreco = tested && tested.children[2] ? tested.children[2].innerHTML
+      : (info.preco ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-orange">—</span>');
+    const cSaldo = tested && tested.children[3] ? tested.children[3].innerHTML
+      : '<span class="muted">—</span>';
+    const cDetalhe = tested && tested.children[4] ? tested.children[4].textContent
+      : (info.ask ? `ask ${info.ask} · bid ${info.bid}` : (info.erro ? info.erro.slice(0, 60) : '—'));
+    return `<tr id="apitest-${eid}">
+      <td><b style="color:${EX_COLORS[eid] || 'var(--text)'}">${info.label}</b></td>
+      <td>${info.chave ? '<span class="badge badge-green">✓ tem chave</span>' : '<span class="badge badge-orange">sem chave</span>'}</td>
+      <td>${cPreco}</td>
+      <td>${cSaldo}</td>
+      <td class="muted small">${cDetalhe}</td>
+      <td><button class="btn-mini" onclick="testOneApi('${eid}')">🧪</button></td>
+    </tr>`;
+  });
+  body.innerHTML = linhas.join('') || '<tr><td colspan="6" class="muted">sem corretoras</td></tr>';
+}
 setInterval(() => {
   if ($('tab-oportunidades').classList.contains('active')) loadDex();
 }, 30000);
@@ -1063,6 +1091,55 @@ window.clearSettings = async function(eid) {
   msg.textContent = '✓ Removida';
   msg.style.color = 'var(--green)';
   setTimeout(() => { msg.textContent = ''; }, 3000);
+};
+
+/* ---------- TESTE DE API ---------- */
+async function testAllApis() {
+  const body = $('apiTestBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">testando... (pode levar alguns segundos)</td></tr>';
+  let status = {};
+  try { status = await api('/api/api-status'); } catch (e) { /* ignora */ }
+  const rows = [];
+  for (const [eid, info] of Object.entries(status)) {
+    rows.push(`<tr id="apitest-${eid}">
+      <td><b style="color:${EX_COLORS[eid] || 'var(--text)'}">${info.label}</b></td>
+      <td>${info.chave ? '<span class="badge badge-green">✓ tem chave</span>' : '<span class="badge badge-orange">sem chave</span>'}</td>
+      <td>${info.preco ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-orange">—</span>'}</td>
+      <td>—</td><td class="muted small">aguardando…</td>
+      <td><button class="btn-mini" onclick="testOneApi('${eid}')">🧪</button></td>
+    </tr>`);
+  }
+  body.innerHTML = rows.join('') || '<tr><td colspan="6" class="muted">sem corretoras</td></tr>';
+  for (const eid of Object.keys(status)) {
+    testOneApi(eid);
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
+
+window.testOneApi = async function(eid) {
+  const tr = $(`apitest-${eid}`);
+  try {
+    const r = await api(`/api/api-test?exchange=${eid}`, { method: 'POST' });
+    if (!tr) return;
+    const cells = tr.querySelectorAll('td');
+    if (cells[2]) cells[2].innerHTML = r.preco
+      ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-orange">✗</span>';
+    if (cells[3]) cells[3].innerHTML = r.saldo
+      ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-orange">✗</span>';
+    if (cells[4]) {
+      const partes = [];
+      if (r.aviso) partes.push(r.aviso);
+      if (r.moedas && Object.keys(r.moedas).length) {
+        const lista = Object.entries(r.moedas).map(([k, v]) => `${k}=${Number(v).toFixed(2)}`).join(', ');
+        partes.push(lista);
+      }
+      if (r.erro_preco) partes.push('preço: ' + r.erro_preco);
+      if (r.erro_saldo) partes.push('saldo: ' + r.erro_saldo);
+      if (r.ms_total) partes.push(`${r.ms_total}ms`);
+      cells[4].textContent = partes.join(' · ') || '—';
+    }
+  } catch (e) { /* ignora */ }
 };
 
 /* ---------- CALCULATOR ---------- */

@@ -107,8 +107,9 @@ class Scanner:
                 import os
                 opts = {
                     'enableRateLimit': True,
-                    # timeout curto: falhar rapido e melhor que travar o scan inteiro
-                    'timeout': 8000 if not is_cloud else 15000,
+                    # timeout generoso: carregar lista de pares (load_markets) é lento
+                    # em corretoras grandes (binance/okx) e precisa de tempo
+                    'timeout': 30000 if not is_cloud else 60000,
                     'options': {'defaultType': 'spot', 'recvWindow': 60000},
                 }
                 if eid in ('binance', 'htx'):
@@ -340,6 +341,13 @@ class Scanner:
 
         def _fetch(eid, ex):
             m = {}
+            # timeout curto só na leitura de preço: falhar rápido é melhor que
+            # travar o scan inteiro (uma corretora lenta não pode derrubar as outras)
+            timeout_original = getattr(ex, 'timeout', None)
+            try:
+                ex.timeout = 8000
+            except Exception:
+                pass
             for pair in config.PAIRS:
                 try:
                     t = ex.fetch_ticker(pair)
@@ -356,6 +364,11 @@ class Scanner:
                 direct = self._fetch_direct(eid, ex)
                 if direct:
                     m = direct
+            if timeout_original is not None:
+                try:
+                    ex.timeout = timeout_original
+                except Exception:
+                    pass
             if not m:
                 if eid not in self.errors:
                     with self.lock:
@@ -464,6 +477,59 @@ class Scanner:
             self._last_sim[key] = now
             picked.append(o)
         return picked
+
+    def _coins_from_balance(self, b):
+        coins = {}
+        for coin in ['BRL', 'USDT', 'BTC', 'ETH', 'SOL', 'USDC']:
+            free = float((b.get('free') or {}).get(coin, 0) or 0)
+            used = float((b.get('used') or {}).get(coin, 0) or 0)
+            total = free + used
+            if total > 0:
+                coins[coin] = {'free': round(free, 8), 'used': round(used, 8),
+                               'total': round(total, 8)}
+        return coins
+
+    def fetch_balance_one(self, eid):
+        """Saldo de UMA corretora (rapido) — usado no teste de API."""
+        import os as _os
+        if eid == 'mercadobitcoin':
+            return self._fetch_mb_balance()
+        ex = self.exchanges.get(eid)
+        if ex is None:
+            return {'error': 'corretora nao conectada'}
+        if not ex.apiKey:
+            return {'error': 'sem API key'}
+        try:
+            b = ex.fetch_balance()
+            return {'ok': True, 'coins': self._coins_from_balance(b)}
+        except Exception as e:
+            return {'error': f'{type(e).__name__}: {str(e)[:120]}'}
+
+    def _fetch_mb_balance(self):
+        import hmac, hashlib, time as _t, os as _os, requests as _req
+        mb_key = _os.environ.get('MERCADOBITCOIN_API_KEY', '')
+        mb_secret = _os.environ.get('MERCADOBITCOIN_SECRET_KEY', '')
+        if not (mb_key and mb_secret):
+            return {'error': 'sem API key/secret'}
+        try:
+            ts = str(int(_t.time()))
+            msg = f'{mb_key}{ts}'
+            sign = hmac.new(mb_secret.encode(), msg.encode(), hashlib.sha256).hexdigest()
+            r = _req.get('https://api.mercadobitcoin.net/api/v4/my-balance/',
+                         headers={'API-Key': mb_key, 'API-Sign': sign, 'Timestamp': ts},
+                         timeout=12)
+            data = r.json()
+            coins = {}
+            for item in data.get('balances', []):
+                coin = item.get('currency', '')
+                free = float(item.get('available', 0) or 0)
+                locked = float(item.get('locked', 0) or 0)
+                if free + locked > 0:
+                    coins[coin] = {'free': round(free, 8), 'used': round(locked, 8),
+                                   'total': round(free + locked, 8)}
+            return {'ok': True, 'coins': coins}
+        except Exception as e:
+            return {'error': f'{type(e).__name__}: {str(e)[:120]}'}
 
     def fetch_balances(self):
         balances = {}

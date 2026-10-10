@@ -489,6 +489,72 @@ def _clear_key_db(eid, field):
         pass
 
 
+@app.get("/api/api-status")
+def api_status():
+    """Situacao de cada API: chave, preco publico e saldo autenticado."""
+    import time as _t
+    snap = scanner.snapshot()
+    prices = snap.get('prices', {}) or {}
+    errors = snap.get('errors', {}) or {}
+    out = {}
+    for eid, info in EXCHANGE_FIELDS.items():
+        tem_chave = False
+        for f in info['fields']:
+            k = _env_key(eid, f)
+            if os.environ.get(k) or db.get_setting(f'key_{k}'):
+                tem_chave = True
+                break
+        p = (prices.get(eid) or {}).get('USDT/BRL')
+        out[eid] = {
+            'label': info['label'],
+            'chave': tem_chave,
+            'preco': bool(p),
+            'ask': p.get('ask') if p else None,
+            'bid': p.get('bid') if p else None,
+            'erro': errors.get(eid, ''),
+        }
+    return out
+
+
+@app.post("/api/api-test")
+def api_test(exchange: str):
+    """Testa de verdade: preco publico + saldo autenticado de UMA corretora."""
+    import time as _t
+    eid = (exchange or '').strip().lower()
+    if eid not in EXCHANGE_FIELDS:
+        return {'ok': False, 'erro': 'corretora desconhecida'}
+    started = _t.time()
+    res = {'exchange': eid, 'label': EXCHANGE_FIELDS[eid]['label'], 'preco': False, 'saldo': False}
+
+    # 1) preco publico
+    try:
+        t0 = _t.time()
+        info = scanner.fetch_balance_one(eid)
+        if isinstance(info, dict) and not info.get('error'):
+            res['saldo'] = True
+            moedas = {k: v['total'] for k, v in (info.get('coins') or {}).items()}
+            res['moedas'] = moedas
+            if not moedas:
+                res['aviso'] = 'conta sem saldo — API funciona ✅'
+            res['ms_saldo'] = int((_t.time() - t0) * 1000)
+        else:
+            res['erro_saldo'] = (info or {}).get('error', 'sem resposta')
+    except Exception as e:
+        res['erro_saldo'] = f'{type(e).__name__}: {str(e)[:120]}'
+
+    # 2) preco (do ultimo scan, sem custo extra)
+    snap = scanner.snapshot()
+    p = (snap.get('prices', {}).get(eid) or {}).get('USDT/BRL')
+    if p:
+        res['preco'] = True
+        res['ask'] = p.get('ask')
+        res['bid'] = p.get('bid')
+
+    res['ms_total'] = int((_t.time() - started) * 1000)
+    res['ok'] = bool(res['preco'] or res['saldo'])
+    return res
+
+
 @app.get("/api/settings")
 def get_settings():
     result = {}
