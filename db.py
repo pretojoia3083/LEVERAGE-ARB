@@ -77,10 +77,12 @@ def _init():
             elapsed_ms INTEGER,
             mode TEXT,
             ok INTEGER DEFAULT 1,
-            stages_json TEXT
+            stages_json TEXT,
+            est_real_seconds INTEGER DEFAULT 0
         )
         """)
         c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS ok INTEGER DEFAULT 1")
+        c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS est_real_seconds INTEGER DEFAULT 0")
         c.execute("""
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
@@ -122,12 +124,15 @@ def _init():
             elapsed_ms INTEGER,
             mode TEXT,
             ok INTEGER DEFAULT 1,
-            stages_json TEXT
+            stages_json TEXT,
+            est_real_seconds INTEGER DEFAULT 0
         )
         """)
         cols = [r[1] for r in c.execute("PRAGMA table_info(executions)").fetchall()]
         if 'ok' not in cols:
             c.execute("ALTER TABLE executions ADD COLUMN ok INTEGER DEFAULT 1")
+        if 'est_real_seconds' not in cols:
+            c.execute("ALTER TABLE executions ADD COLUMN est_real_seconds INTEGER DEFAULT 0")
         c.execute("""
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
@@ -236,8 +241,9 @@ def add_execution(r):
         rid = _insert_id(c, """
         INSERT INTO executions
         (pair, buy_exchange, sell_exchange, invest_usdt, network,
-         gross_pct, net_usdt, net_pct, elapsed_ms, mode, ok, stages_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         gross_pct, net_usdt, net_pct, elapsed_ms, mode, ok, stages_json,
+         est_real_seconds)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             r['pair'], r['buy_exchange'], r['sell_exchange'],
             r.get('invest_usdt', 0), r.get('network', ''),
@@ -245,6 +251,7 @@ def add_execution(r):
             r.get('elapsed_ms', 0), r.get('mode', 'paper'),
             1 if r.get('ok') else 0,
             json.dumps(r.get('stages', [])),
+            r.get('est_real_seconds', 0) or 0,
         ))
         c.commit()
         c.close()
@@ -259,7 +266,7 @@ def recent_executions(limit=100):
     c.close()
     cols = ['id', 'ts', 'pair', 'buy_exchange', 'sell_exchange', 'invest_usdt',
             'network', 'gross_pct', 'net_usdt', 'net_pct', 'elapsed_ms',
-            'mode', 'ok', 'stages_json']
+            'mode', 'ok', 'stages_json', 'est_real_seconds']
     out = []
     for r in rows:
         d = dict(zip(cols, r))

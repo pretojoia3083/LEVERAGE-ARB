@@ -93,6 +93,17 @@ function fmtTime(sec) {
   return `${Math.floor(sec / 60)}min ${String(sec % 60).padStart(2, '0')}s`;
 }
 
+// tempo da execução: em paper/demo a operação é instantânea,
+// então mostra o tempo estimado de verdade (com a transferência)
+function xTime(x) {
+  const ms = Number(x.elapsed_ms) || 0;
+  const est = Number(x.est_real_seconds) || 0;
+  if (x.mode === 'paper' || ms < 1000) {
+    return `<span class="badge badge-orange" title="tempo estimado com transferência">⏱ ~${fmtTime(est)} (est.)</span>`;
+  }
+  return `<span class="badge badge-green">⏱ ${(ms / 1000).toFixed(1)}s</span>`;
+}
+
 let DASH = null;
 let totalSimOld = 0;
 
@@ -441,8 +452,7 @@ window.execRoute = async function (pair, buyEx, sellEx) {
     <div class="row"><span>Rota</span><b>${res.pair} · ${res.buy_exchange} → ${res.sell_exchange}</b></div>
     <div class="row"><span>Rede</span><b>${res.network}</b></div>
     <div class="row"><span>Lucro líquido</span><b class="${res.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(res.net_usdt)} (${res.net_pct}%)</b></div>
-    <div class="row"><span>⏱ Tempo real da operação</span><b>${res.elapsed_fmt}</b></div>
-    <div class="row"><span>Tempo em dinheiro real (com transferência)</span><b>~${fmtTime(res.est_real_seconds)}</b></div>
+    <div class="row"><span>⏱ Tempo em dinheiro real (com transferência)</span><b>~${fmtTime(res.est_real_seconds)}</b></div>
     <div class="muted" style="font-size:11px;margin-top:8px">Modo paper-trade: preços reais, ordens simuladas.</div>`;
   setTimeout(() => toast.classList.remove('show'), 9000);
 };
@@ -487,7 +497,7 @@ async function loadHistory() {
       <td>${x.network}</td>
       <td><span class="badge badge-orange">${x.mode}</span></td>
       <td>${fmtBrl(x.invest_usdt)}</td>
-      <td><span class="badge badge-green">⏱ ${x.elapsed_fmt}</span></td>
+      <td>${xTime(x)}</td>
       <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(x.net_usdt)}</b></td>
     </tr>`).join('');
   $('execBody').innerHTML = exRows ||
