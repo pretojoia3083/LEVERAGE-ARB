@@ -389,8 +389,30 @@
       <div class="card p5">
         <div class="card-head noborder">
           <h2>⏳ Operação demo em andamento</h2>
+          <span class="muted small" id="demoOpInfo"></span>
         </div>
         <div id="demoPending" class="muted">Nenhuma operação demo agora.</div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>🧠 Como o bot decide (regras reais)</h2>
+        </div>
+        <div id="demoRules" class="muted" style="line-height:2;font-size:14px">
+          <b>1.</b> Cada arbitragem leva o tempo real da rota (ex: <b>~3min</b> de transferência). A venda só acontece no fim.<br>
+          <b>2.</b> Terminou? O bot só repete <b>se o spread estiver favorável de novo</b> — nunca em loop automático.<br>
+          <b>3.</b> A mesma rota espera o spread <b>reacender</b> antes de entrar de novo.<br>
+          <b>4.</b> Respeita <b>carteira virtual</b>: sem BRL na corretora, não opera.<br>
+          <b>5.</b> Teto de operações por dia para não inflar resultado.
+        </div>
+      </div>
+
+      <div class="card p5">
+        <div class="card-head noborder">
+          <h2>👛 Carteira virtual da demo</h2>
+          <span class="muted small">o dinheiro se movendo como se fosse real</span>
+        </div>
+        <div id="demoWallet" class="balances-grid"><div class="balance-empty">ligue o BOT Demo para ver</div></div>
       </div>
 
       <div class="card">

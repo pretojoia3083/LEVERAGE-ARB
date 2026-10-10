@@ -9,12 +9,107 @@ import db
 from engine import simulate
 
 
+def fmt_brl(v):
+    return f"R${float(v or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def sim_fee_sell(t):
+    """Taxa taker da corretora de venda (para devolver o BRL liquido)."""
+    return float(config.TAKER_FEES.get(t.get('sell_exchange'), 0.001))
+
+
 class Executor:
     def __init__(self):
         self.lock = threading.Lock()
         self.counter = 0
-        self.mode = 'paper'  # 'paper' ou 'real'
+        self.mode = 'paper'  # 'paper', 'demo' ou 'real'
         self.pending_transfers = []
+        # controle realista da demo
+        self.wallet = {}          # {ex: {'BRL': float, 'USDT': float}}
+        self._demo_routes = {}    # rota -> ultima vez executada
+        self._demo_last = 0       # ultima operacao demo (timestamp)
+        self._demo_times = []     # timestamps das operacoes demo (teto diario)
+        self._demo_ref = None     # (spread_pct, timestamp) da ultima operacao
+
+    def demo_wallet_for(self, ex):
+        """Carteira virtual: cada corretora comeca com o capital inicial."""
+        if ex not in self.wallet:
+            self.wallet[ex] = {'BRL': config.DEMO_START_BRL, 'USDT': 0.0}
+        return self.wallet[ex]
+
+    def demo_wallet_state(self):
+        return {ex: dict(v) for ex, v in self.wallet.items()}
+
+    def _demo_blocked_reason(self, o):
+        """Travas que impedem arbitragem continua/infinita (igual vida real)."""
+        now = time.time()
+        with self.lock:
+            if any(t.get('demo') for t in self.pending_transfers):
+                return 'operacao demo em andamento (aguardando a venda)'
+            day = now - 86400
+            self._demo_times = [t for t in self._demo_times if t >= day]
+            if len(self._demo_times) >= config.DEMO_MAX_PER_DAY:
+                return f'limite diario de {config.DEMO_MAX_PER_DAY} operacoes atingido'
+            if self._demo_last:
+                espera = self._demo_last + config.DEMO_MIN_INTERVAL_MIN * 60 - now
+                if espera > 0:
+                    return f'aguarda {int(espera // 60)}min {int(espera % 60)}s entre operacoes'
+            # so entra se ainda estiver favoravel (spread minimo + margem)
+            alvo = float(config.MIN_SPREAD_PCT) + float(getattr(config, 'DEMO_MARGIN_PCT', 0.05))
+            # memoria do spread: nao aceita pior que o da ultima operacao (ate expirar)
+            ref, ref_ts = self._demo_ref or (None, 0)
+            ttl = float(getattr(config, 'DEMO_REF_TTL_MIN', 30)) * 60
+            if ref is not None and now - ref_ts <= ttl:
+                if float(o.get('net_pct') or 0) < ref:
+                    return (f'spread {o.get("net_pct")}% esta pior que o da ultima '
+                            f'operacao ({ref}%) — espera melhorar')
+                alvo = max(alvo, ref)
+            if float(o.get('net_pct') or 0) < alvo:
+                return f'spread {o.get("net_pct")}% abaixo do alvo {round(alvo, 4)}%'
+            rota = (o.get('buy_exchange'), o.get('sell_exchange'))
+            ult = self._demo_routes.get(rota, 0)
+            if ult:
+                espera = ult + config.DEMO_ROUTE_COOLDOWN_MIN * 60 - now
+                if espera > 0:
+                    return f'spread desta rota ({rota[0]}→{rota[1]}) reacende em {int(espera // 60)}min'
+            w = self.demo_wallet_for(o.get('buy_exchange'))
+            if float(w.get('BRL', 0)) < 10:
+                return f'sem BRL na {o.get("buy_exchange")} (carteira virtual)'
+        return None
+
+    def demo_status(self):
+        now = time.time()
+        day = now - 86400
+        ttl = float(getattr(config, 'DEMO_REF_TTL_MIN', 30)) * 60
+        with self.lock:
+            times = [t for t in self._demo_times if t >= day]
+            last = self._demo_last
+            routes = {}
+            for (b, s), t in self._demo_routes.items():
+                restante = int(max(0, t + config.DEMO_ROUTE_COOLDOWN_MIN * 60 - now) // 60)
+                if restante > 0:
+                    routes[f'{b}→{s}'] = restante
+            w = {ex: dict(v) for ex, v in self.wallet.items()}
+            ref = self._demo_ref
+        alvo = float(config.MIN_SPREAD_PCT) + float(getattr(config, 'DEMO_MARGIN_PCT', 0.05))
+        if ref:
+            alvo = max(alvo, ref[0])
+        return {
+            'ops_24h': len(times),
+            'max_per_day': config.DEMO_MAX_PER_DAY,
+            'min_interval_min': config.DEMO_MIN_INTERVAL_MIN,
+            'route_cooldown_min': config.DEMO_ROUTE_COOLDOWN_MIN,
+            'ref_ttl_min': getattr(config, 'DEMO_REF_TTL_MIN', 30),
+            'ref_spread': ref[0] if ref else None,
+            'ref_expira_em_min': int(max(0, (ref[1] + ttl - now) // 60)) if ref else 0,
+            'spread_alvo': round(alvo, 4),
+            'next_in_min': int(max(0, last + config.DEMO_MIN_INTERVAL_MIN * 60 - now) // 60),
+            'routes_waiting': routes,
+            'wallet': w,
+            'start_brl': config.DEMO_START_BRL,
+            'total_brl': round(sum(v.get('BRL', 0) for v in w.values()), 2),
+            'total_usdt': round(sum(v.get('USDT', 0) for v in w.values()), 2),
+        }
 
     def set_mode(self, mode):
         if mode not in ('paper', 'demo', 'real'):
@@ -72,6 +167,9 @@ class Executor:
             with self.lock:
                 if any(t.get('demo') for t in self.pending_transfers):
                     return {'ok': False, 'error': 'demo ja em andamento'}
+            bloqueio = self._demo_blocked_reason(o)
+            if bloqueio:
+                return {'ok': False, 'error': bloqueio}
             return self._execute_demo(scanner, o)
         return self.execute(scanner, o['pair'], o['buy_exchange'],
                             o['sell_exchange'], o['invest_usdt'], o['network'])
@@ -100,14 +198,14 @@ class Executor:
                                 'sell_exchange': sell_ex, 'gross_pct': g}
         if not best:
             return {'ok': False, 'error': 'sem preços das corretoras ainda'}
-        with self.lock:
-            if any(t.get('demo') for t in self.pending_transfers):
-                return {'ok': False, 'error': 'demo ja em andamento'}
         o = dict(best)
         o['invest_usdt'] = float(config.INVESTMENT_USDT)
         o['network'] = 'AUTO'
         o['net_pct'] = round(best['gross_pct'], 4)
         o['net_usdt'] = 0
+        bloqueio = self._demo_blocked_reason(o)
+        if bloqueio:
+            return {'ok': False, 'error': bloqueio}
         return self._execute_demo(scanner, o)
 
     def _execute_demo(self, scanner, o):
@@ -127,6 +225,28 @@ class Executor:
         buy_qty = sim['quantity']
         chosen_net = next(n for n in sim['networks'] if n['network'] == sim['network'])
         tx_fee = chosen_net['withdrawal_fee_usd']
+
+        # tempo real da arbitragem (ex: 3min de transferencia) — a venda so ocorre no fim
+        settle = int(chosen_net.get('est_seconds') or getattr(_cfg, 'DEMO_SETTLE_SECONDS', 180))
+        settle = max(30, min(settle, 3600))
+
+        # carteira virtual: o dinheiro sai da corretora de compra
+        w_buy = self.demo_wallet_for(o['buy_exchange'])
+        if float(w_buy.get('BRL', 0)) < o['invest_usdt']:
+            return {'ok': False, 'error': f"sem BRL na {o['buy_exchange']} (tem {fmt_brl(w_buy.get('BRL', 0))})"}
+        w_buy['BRL'] = round(w_buy['BRL'] - o['invest_usdt'], 2)
+        w_buy['USDT'] = round(w_buy.get('USDT', 0) + buy_qty, 6)
+
+        with self.lock:
+            self._demo_last = started
+            self._demo_times.append(started)
+            self._demo_routes[(o['buy_exchange'], o['sell_exchange'])] = started
+            # guarda o spread desta operacao como referencia para as proximas
+            try:
+                ref = round(float(o.get('net_pct') or sim['net_pct']), 4)
+            except Exception:
+                ref = sim['net_pct']
+            self._demo_ref = (ref, started)
         stages = [{'stage': 'compra (demo)', 'exchange': o['buy_exchange'],
                    'price': round(buy_price, 8), 'qty': round(buy_qty, 8),
                    'seconds': 0}]
@@ -139,7 +259,7 @@ class Executor:
             'buy_qty': buy_qty,
             'sell_qty': round(max(buy_qty - sim['networks'][0]['withdrawal_fee_usd'] / sell_side['bid'], 0), 8),
             'demo': True,
-            'settle_at': started + getattr(_cfg, 'DEMO_SETTLE_SECONDS', 45),
+            'settle_at': started + settle,
             'deposit_addr': 'demo — sem transferência real',
             'deposit_tag': None,
             'network': sim['network'],
@@ -156,7 +276,7 @@ class Executor:
             transfer['id'] = self.counter
             self.pending_transfers.append(transfer)
         print(f"[DEMO] Compra simulada {o['pair']} {o['buy_exchange']}->{o['sell_exchange']} "
-              f"R${o['invest_usdt']} — vende sozinha em {getattr(_cfg, 'DEMO_SETTLE_SECONDS', 45)}s")
+              f"R${o['invest_usdt']} — vende sozinha em {settle}s")
         result = {
             'ok': True, 'id': transfer['id'], 'mode': 'demo',
             'status': 'aguardando_transferencia',
@@ -184,6 +304,11 @@ class Executor:
         t['stages'].append({'stage': 'venda (demo)', 'exchange': t['sell_exchange'],
                             'price': round(sell_price, 8), 'qty': round(sell_qty, 8),
                             'seconds': round(time.time() - t['started'], 1)})
+        # dinheiro volta (com lucro/prejuizo) para a carteira da corretora de compra
+        w_buy = self.demo_wallet_for(t['buy_exchange'])
+        w_sell = self.demo_wallet_for(t['sell_exchange'])
+        w_sell['USDT'] = round(max(0.0, w_sell.get('USDT', 0) - sell_qty), 6)
+        w_buy['BRL'] = round(w_buy.get('BRL', 0) + gross_brl * (1 - sim_fee_sell(t)), 2)
         result = {
             'ok': True, 'id': t['id'], 'mode': 'demo', 'status': 'concluido',
             'pair': t['pair'], 'buy_exchange': t['buy_exchange'],

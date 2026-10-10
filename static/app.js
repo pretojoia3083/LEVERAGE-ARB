@@ -613,7 +613,9 @@ window.saveDemoInvestment = async function() {
 async function loadDemo() {
   if (!$('demoState')) return;
   try {
-    const [a, m] = await Promise.all([api('/api/auto'), api('/api/mode')]);
+    const [a, m, st] = await Promise.all([
+      api('/api/auto'), api('/api/mode'), api('/api/demo/status'),
+    ]);
     AUTO_ON = a.auto_trade;
     MODE = m.mode || 'paper';
     updateAutoUI();
@@ -621,17 +623,47 @@ async function loadDemo() {
     const on = AUTO_ON && MODE === 'demo';
     $('demoState').textContent = on ? '● Rodando' : 'Desligado';
     $('demoState').className = 'card-value font-display ' + (on ? 'green' : 'orange');
-    $('demoStateSub').textContent = on
-      ? 'entrando sozinho acima do spread · dinheiro fictício'
-      : 'clique em Ligar pra começar';
+    const rotas = Object.entries(st.routes_waiting || {});
+    const esperaTxt = rotas.length
+      ? `aguardando spread reacender: ${rotas.map(([r, m2]) => `${r} (${m2}min)`).join(', ')}`
+      : 'entrando sozinho quando o spread estiver favorável';
+    $('demoStateSub').textContent = on ? esperaTxt : 'clique em Ligar pra começar';
+
     const btn = $('demoToggleBtn');
     if (btn) {
       btn.textContent = on ? '⏹ Desligar BOT Demo' : '▶ Ligar BOT Demo';
       btn.className = 'toggle-btn ' + (on ? 'active-green' : '');
     }
     if (DASH) {
-      $('demoSpread').textContent = (DASH.min_spread ?? 0.10) + '%';
+      $('demoSpread').textContent = (st.spread_alvo ?? DASH.min_spread ?? 0.1) + '%';
       $('demoInvest').textContent = fmtBrl(DASH.investment ?? 50);
+    }
+
+    // info de regras
+    const info = $('demoOpInfo');
+    if (info) {
+      const partes = [`${st.ops_24h}/${st.max_per_day} operações hoje`];
+      if (st.next_in_min > 0) partes.push(`próxima em ${st.next_in_min}min`);
+      if (st.ref_spread !== null && st.ref_spread !== undefined) {
+        partes.push(`último spread ${st.ref_spread}% (referência expira em ${st.ref_expira_em_min}min)`);
+      }
+      info.textContent = partes.join(' · ');
+    }
+
+    // carteira virtual
+    const wbox = $('demoWallet');
+    if (wbox) {
+      const w = st.wallet || {};
+      const chaves = Object.keys(w);
+      wbox.innerHTML = chaves.length ? chaves.map(ex => `
+        <div class="balance-card">
+          <div class="balance-card-header">
+            <span class="ex-name" style="color:${EX_COLORS[ex] || 'var(--text)'}">${ex}</span>
+            <span class="bal-status ok">✓</span>
+          </div>
+          <div class="balance-coin"><span class="balance-coin-name">BRL</span><span class="balance-coin-free">${fmtBrl(w[ex].BRL)}</span></div>
+          <div class="balance-coin"><span class="balance-coin-name">USDT</span><span class="balance-coin-free">${(w[ex].USDT || 0).toFixed(2)}</span></div>
+        </div>`).join('') : '<div class="balance-empty">ligue o BOT Demo para ver o dinheiro se movendo</div>';
     }
     const pend = ((DASH && DASH.pending_transfers) || []).filter(t => t.demo);
     const box = $('demoPending');
@@ -990,7 +1022,7 @@ function renderPending(pending) {
           <span>💰 Lucro agora (ao vivo)</span><b class="${t.live_net >= 0 ? 'green' : 'red'}">${fmtBrl(t.live_net)} (${t.live_pct}%)</b>
         </div>` : ''}
         <div class="pending-row">
-          <span>Vende sozinha em</span><b class="orange">⏱ ${t.seconds_left ?? '?'}s</b>
+          <span>⏱ Tempo real da arbitragem</span><b class="orange">${fmtTime(t.seconds_left ?? 0)} restantes</b>
         </div>
       </div>`;
     }

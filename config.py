@@ -24,8 +24,20 @@ TOP_LIMIT = 50
 SPREAD_OPTIONS = [0.00, 0.02, 0.05, 0.10, 0.20, 0.50, 1.0, 2.0]
 MIN_SPREAD_PCT = float(os.environ.get('MIN_SPREAD_PCT', '0.10'))
 
-# Demo: tempo simulado da transferencia antes da venda automatica (segundos)
-DEMO_SETTLE_SECONDS = 45
+# Demo: tempo simulado da transferencia antes da venda automatica (segundos).
+# 0 = usa o tempo estimado real da rota (ex: ~3min). Ver executor.py.
+DEMO_SETTLE_SECONDS = 0
+
+# Demo: limites realistas (evitam "arbitragem infinita" que nao existe na vida real)
+DEMO_START_BRL = float(os.environ.get('DEMO_START_BRL', '5000'))      # carteira virtual inicial
+DEMO_ROUTE_COOLDOWN_MIN = float(os.environ.get('DEMO_ROUTE_COOLDOWN_MIN', '15'))  # spread precisa reabrir
+DEMO_MIN_INTERVAL_MIN = float(os.environ.get('DEMO_MIN_INTERVAL_MIN', '10'))      # intervalo entre operações
+DEMO_MAX_PER_DAY = int(os.environ.get('DEMO_MAX_PER_DAY', '40'))                   # teto diário
+# margem extra sobre o spread minimo para o bot demoso entrar em spread apertado
+DEMO_MARGIN_PCT = float(os.environ.get('DEMO_MARGIN_PCT', '0.05'))
+# se o spread ficar PIOR que o da ultima operacao, o bot espera.
+# depois deste tempo (min) a referencia expira e ele volta a aceitar
+DEMO_REF_TTL_MIN = float(os.environ.get('DEMO_REF_TTL_MIN', '30'))
 
 # Redes preferidas (BEP20 + Polygon primeiro, resto como reserva)
 NETWORK_PRIORITY = ['BEP20', 'POLYGON', 'ARBITRUM', 'SOL', 'TRC20', 'ERC20']

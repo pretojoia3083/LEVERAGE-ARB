@@ -209,6 +209,14 @@ def demo_run():
         return {'ok': False, 'error': str(e)[:150]}
 
 
+@app.get("/api/demo/status")
+def demo_status():
+    try:
+        return executor.demo_status()
+    except Exception as e:
+        return {'erro': str(e)[:150]}
+
+
 @app.get("/api/dashboard")
 def dashboard():
     snap = scanner.snapshot()
