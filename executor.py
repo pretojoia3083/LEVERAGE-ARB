@@ -539,9 +539,12 @@ class Executor:
             'pair': o['pair'], 'buy_exchange': o['buy_exchange'],
             'sell_exchange': o['sell_exchange'], 'invest_usdt': o['invest_usdt'],
             'network': sim['network'], 'gross_pct': sim['gross_pct'],
-            'net_usdt': sim['net_usdt'], 'net_pct': sim['net_pct'],
+            # ordem ABERTA: o lucro ainda nao aconteceu (evita contagem dupla)
+            'net_usdt': 0, 'net_pct': 0,
             'elapsed_ms': 0, 'elapsed_fmt': '0.0s',
             'est_real_seconds': sim['est_seconds'], 'stages': stages,
+            'transfer_id': transfer['id'], 'done': False,
+            'saldo_apos': round(self.demo_capital + o['invest_usdt'], 2),
         }
         db.add_execution(result)
         return result
@@ -586,7 +589,9 @@ class Executor:
             'elapsed_ms': elapsed_ms, 'elapsed_fmt': f"{elapsed_ms / 1000:.1f}s",
             'est_real_seconds': t['sim']['est_seconds'], 'stages': t['stages'],
         }
-        db.add_execution(result)
+        # ATUALIZA a linha que foi aberta (nao cria outra): evita contar 2x
+        db.finish_execution(t.get('id'), result)
+        result['saldo_apos'] = round(float(self.demo_capital), 2)
         with self.lock:
             if t in self.pending_transfers:
                 self.pending_transfers.remove(t)
@@ -744,12 +749,15 @@ class Executor:
             'invest_usdt': invest_usdt,
             'network': network_name,
             'gross_pct': sim['gross_pct'],
-            'net_usdt': sim['net_usdt'],
-            'net_pct': sim['net_pct'],
+            # ordem ABERTA: o lucro so existe quando a venda acontecer
+            'net_usdt': 0,
+            'net_pct': 0,
             'elapsed_ms': int((time.time() - started) * 1000),
             'elapsed_fmt': f"{(time.time() - started):.1f}s",
             'est_real_seconds': sim['est_seconds'],
             'stages': stages,
+            'transfer_id': transfer['id'],
+            'done': False,
             'transfer': {
                 'qty': round(buy_qty, 6),
                 'network': network_name,
@@ -840,7 +848,7 @@ class Executor:
                 'est_real_seconds': t['sim']['est_seconds'],
                 'stages': t['stages'],
             }
-            db.add_execution(result)
+            db.finish_execution(t.get('id'), result)
 
             with self.lock:
                 if t in self.pending_transfers:

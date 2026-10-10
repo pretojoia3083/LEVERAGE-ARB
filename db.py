@@ -88,11 +88,16 @@ def _init():
             mode TEXT,
             ok INTEGER DEFAULT 1,
             stages_json TEXT,
-            est_real_seconds INTEGER DEFAULT 0
+            est_real_seconds INTEGER DEFAULT 0,
+            transfer_id INTEGER,
+            done INTEGER DEFAULT 1
         )
         """)
         c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS ok INTEGER DEFAULT 1")
         c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS est_real_seconds INTEGER DEFAULT 0")
+        c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS transfer_id INTEGER")
+        c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS done INTEGER DEFAULT 1")
+        c.execute("ALTER TABLE executions ADD COLUMN IF NOT EXISTS saldo_apos REAL DEFAULT 0")
         c.execute("""
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
@@ -135,7 +140,9 @@ def _init():
             mode TEXT,
             ok INTEGER DEFAULT 1,
             stages_json TEXT,
-            est_real_seconds INTEGER DEFAULT 0
+            est_real_seconds INTEGER DEFAULT 0,
+            transfer_id INTEGER,
+            done INTEGER DEFAULT 1
         )
         """)
         cols = [r[1] for r in c.execute("PRAGMA table_info(executions)").fetchall()]
@@ -143,6 +150,12 @@ def _init():
             c.execute("ALTER TABLE executions ADD COLUMN ok INTEGER DEFAULT 1")
         if 'est_real_seconds' not in cols:
             c.execute("ALTER TABLE executions ADD COLUMN est_real_seconds INTEGER DEFAULT 0")
+        if 'transfer_id' not in cols:
+            c.execute("ALTER TABLE executions ADD COLUMN transfer_id INTEGER")
+        if 'done' not in cols:
+            c.execute("ALTER TABLE executions ADD COLUMN done INTEGER DEFAULT 1")
+        if 'saldo_apos' not in cols:
+            c.execute("ALTER TABLE executions ADD COLUMN saldo_apos REAL DEFAULT 0")
         c.execute("""
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
@@ -252,8 +265,8 @@ def add_execution(r):
         INSERT INTO executions
         (pair, buy_exchange, sell_exchange, invest_usdt, network,
          gross_pct, net_usdt, net_pct, elapsed_ms, mode, ok, stages_json,
-         est_real_seconds)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         est_real_seconds, transfer_id, done, saldo_apos)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             r['pair'], r['buy_exchange'], r['sell_exchange'],
             r.get('invest_usdt', 0), r.get('network', ''),
@@ -262,10 +275,37 @@ def add_execution(r):
             1 if r.get('ok') else 0,
             json.dumps(r.get('stages', [])),
             r.get('est_real_seconds', 0) or 0,
+            r.get('transfer_id'),
+            1 if r.get('done', True) else 0,
+            r.get('saldo_apos', 0) or 0,
         ))
         c.commit()
         c.close()
         return rid
+
+
+def finish_execution(transfer_id, r):
+    """Atualiza a ordem ja aberta com o resultado real (nao cria linha nova).
+    Sem isso a ordem aberta (lucro simulado) e a concluida (lucro real)
+    seriam somadas duas vezes no resultado."""
+    if not transfer_id:
+        return None
+    sql = """
+        UPDATE executions SET
+            gross_pct = ?, net_usdt = ?, net_pct = ?,
+            elapsed_ms = ?, ok = ?, stages_json = ?, done = 1, saldo_apos = ?
+        WHERE transfer_id = ? AND done = 0
+    """
+    params = (r.get('gross_pct', 0), r.get('net_usdt', 0), r.get('net_pct', 0),
+              r.get('elapsed_ms', 0), 1 if r.get('ok') else 0,
+              json.dumps(r.get('stages', [])), r.get('saldo_apos', 0) or 0,
+              transfer_id)
+    with db_lock:
+        c = _conn()
+        _exec(c, sql, params)
+        c.commit()
+        c.close()
+    return True
 
 
 def recent_executions(limit=100):
@@ -276,7 +316,8 @@ def recent_executions(limit=100):
     c.close()
     cols = ['id', 'ts', 'pair', 'buy_exchange', 'sell_exchange', 'invest_usdt',
             'network', 'gross_pct', 'net_usdt', 'net_pct', 'elapsed_ms',
-            'mode', 'ok', 'stages_json', 'est_real_seconds']
+            'mode', 'ok', 'stages_json', 'est_real_seconds', 'transfer_id',
+            'done', 'saldo_apos']
     out = []
     for r in rows:
         d = dict(zip(cols, r))
@@ -306,10 +347,10 @@ def daily_stats(mode=None):
     hoje = datetime.now(BRT).date().isoformat()
     c = _conn()
     ex_sql = ("SELECT ts, net_usdt, mode, buy_exchange, sell_exchange, network "
-              "FROM executions")
+              "FROM executions WHERE done = 1")
     ex_params = ()
     if mode:
-        ex_sql += " WHERE mode = ?"
+        ex_sql += " AND mode = ?"
         ex_params = (mode,)
     ex_rows = _exec(c, ex_sql, ex_params).fetchall()
     sim_rows = _exec(c, "SELECT ts, net_usdt, buy_exchange, sell_exchange, network "

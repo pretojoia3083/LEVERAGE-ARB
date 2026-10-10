@@ -551,8 +551,8 @@ async function loadHistory() {
       <td>${x.network}</td>
       <td><span class="badge ${x.mode === 'demo' ? 'badge-green' : x.mode === 'real' ? 'badge-orange' : ''}">${x.mode}</span></td>
       <td class="right">${fmtBrl(x.invest_usdt)}</td>
-      <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(x.net_usdt)}</b></td>
-      <td class="right">${x.net_pct}%</td>
+      <td class="right"><b class="${x.net_usdt >= 0 ? 'green' : 'red'}">${x.done ? fmtBrl(x.net_usdt) : 'em aberto'}</b></td>
+      <td class="right">${x.saldo_apos ? fmtBrl(x.saldo_apos) : '—'}</td>
     </tr>`).join('');
   $('execBody').innerHTML = exRows ||
     `<tr><td colspan="8" style="text-align:center;padding:36px" class="muted">Nenhuma ordem neste filtro.</td></tr>`;
