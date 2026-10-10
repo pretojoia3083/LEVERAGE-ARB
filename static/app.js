@@ -203,6 +203,26 @@ function renderPrices(prices, opps, exchangesOk) {
   }).join('');
 }
 
+function renderNearMiss(list, minSpread) {
+  const card = $('nearCard');
+  const body = $('nearBody');
+  if (!card || !body) return;
+  const rows = (list || []).slice(0, 3);
+  if (!rows.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const min = Number(minSpread || 0);
+  body.innerHTML = rows.map(n => {
+    const faltaPct = (min - n.net_pct).toFixed(4);
+    const faltaBrl = Math.abs(n.net_usdt) < 0.005 ? '—' : fmtBrl(Math.abs(n.net_usdt) * (1 + min / Math.max(n.net_pct, 0.0001)));
+    return `<div class="pending-row">
+      <span>${exBadge(n.buy_exchange)} @${fmtPrice(n.buy_price)} → ${exBadge(n.sell_exchange)} @${fmtPrice(n.sell_price)}
+        <span class="muted small">· ${n.network} · taxas ${((n.taker_buy + n.taker_sell) * 100).toFixed(2)}%</span></span>
+      <b class="${n.net_usdt >= 0 ? 'green' : 'red'}">${fmtBrl(n.net_usdt)} (${n.net_pct}%)</b>
+      <span class="muted small">faltam ${faltaPct}% para ${min}%</span>
+    </div>`;
+  }).join('');
+}
+
 async function pollDashboard() {
   try {
     const d = await api('/api/dashboard');
@@ -232,6 +252,7 @@ async function pollDashboard() {
 
     renderBest(b);
     renderOpps(d.opportunities || []);
+    renderNearMiss(d.near_miss || [], d.min_spread);
     renderPrices(d.prices, d.opportunities || [], d.exchanges_ok || []);
     renderSpreadPills(d.min_spread, d.spread_options);
     renderSpreadPills(d.min_spread, d.spread_options, 'demoSpreadPills');
@@ -494,7 +515,7 @@ setInterval(() => {
 function renderSpreadPills(current, options, boxId) {
   const box = $(boxId || 'spreadPills');
   if (!box) return;
-  const opts = options && options.length ? options : [0.10, 0.20, 0.50, 1.0, 2.0];
+  const opts = options && options.length ? options : [0.00, 0.02, 0.05, 0.10, 0.20, 0.50, 1.0, 2.0];
   box.innerHTML = opts.map(v => `
     <button class="spread-pill${Number(current) === Number(v) ? ' active' : ''}"
       onclick="setSpread(${v})">${Number(v).toFixed(2)}%</button>`).join('');
@@ -518,7 +539,7 @@ async function doSaveSpread(v, msgId) {
     body: JSON.stringify({ min_spread: v }),
   });
   if (res.ok) {
-    const opts = (DASH && DASH.spread_options) || [0.10, 0.20, 0.50, 1.0, 2.0];
+    const opts = (DASH && DASH.spread_options) || [0.00, 0.02, 0.05, 0.10, 0.20, 0.50, 1.0, 2.0];
     renderSpreadPills(res.min_spread, opts);
     renderSpreadPills(res.min_spread, opts, 'demoSpreadPills');
     if (DASH) DASH.min_spread = res.min_spread;

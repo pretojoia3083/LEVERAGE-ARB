@@ -93,6 +93,7 @@ class Scanner:
         self.scan_seconds = None
         self.errors = {}
         self._last_sim = {}
+        self.near_miss = []
 
     def load_exchanges(self):
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -321,6 +322,7 @@ class Scanner:
                 'errors': dict(self.errors),
                 'prices': all_prices,
                 'opportunities': self.opportunities[:config.TOP_LIMIT],
+                'near_miss': list(self.near_miss),
                 'total_opportunities': len(self.opportunities),
                 'best': self.opportunities[0] if self.opportunities else None,
             }
@@ -388,6 +390,7 @@ class Scanner:
             prices['mercadobitcoin'] = mb
 
         opps = []
+        near = []
         min_spread = getattr(config, 'MIN_SPREAD_PCT', 0.10)
         try:
             min_spread = float(min_spread)
@@ -406,19 +409,24 @@ class Scanner:
                     if not ask or not bid or bid <= ask:
                         continue
                     sim = simulate(pair, buy_ex, ask, sell_ex, bid, config.INVESTMENT_USDT, 'AUTO')
-                    if sim['net_pct'] < min_spread or sim['net_usdt'] <= 0:
-                        continue
                     sim['pair'] = pair
                     sim['buy_exchange'] = buy_ex
                     sim['sell_exchange'] = sell_ex
-                    opps.append(sim)
+                    if sim['net_pct'] >= min_spread and sim['net_usdt'] > 0:
+                        opps.append(sim)
+                    else:
+                        near.append(sim)
 
         opps.sort(key=lambda x: x['net_pct'], reverse=True)
         opps = opps[:config.TOP_LIMIT]
+        # rotas mais próximas de lucrar (mostra o que falta)
+        near.sort(key=lambda x: x['net_pct'], reverse=True)
+        near = near[:5]
 
         with self.lock:
             self.prices = prices
             self.opportunities = opps
+            self.near_miss = near
             self.connected = True
             self.last_scan = datetime.utcnow().isoformat() + 'Z'
             self.scan_seconds = round(time.time() - t0, 2)

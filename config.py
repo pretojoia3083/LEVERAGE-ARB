@@ -20,8 +20,8 @@ AUTO_SIM_COOLDOWN = 60
 SCAN_INTERVAL = 5
 TOP_LIMIT = 50
 
-# Spread minimo exibido nas oportunidades (escolhido no menu: 0.10 / 0.20 / 0.50 / 1.0 / 2.0 ou manual)
-SPREAD_OPTIONS = [0.10, 0.20, 0.50, 1.0, 2.0]
+# Spread minimo exibido nas oportunidades (0 = mostra qualquer lucro positivo)
+SPREAD_OPTIONS = [0.00, 0.02, 0.05, 0.10, 0.20, 0.50, 1.0, 2.0]
 MIN_SPREAD_PCT = float(os.environ.get('MIN_SPREAD_PCT', '0.10'))
 
 # Demo: tempo simulado da transferencia antes da venda automatica (segundos)
