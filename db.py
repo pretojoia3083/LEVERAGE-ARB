@@ -280,11 +280,17 @@ def execution_stats():
     total, total_net, wins = _exec(c,
         "SELECT COUNT(*), COALESCE(SUM(net_usdt),0), COALESCE(SUM(ok),0) FROM executions"
     ).fetchone()
+    # quebra por modo (paper / demo / real)
+    por_modo = {}
+    for r in _exec(c, "SELECT mode, COUNT(*), COALESCE(SUM(net_usdt),0) "
+                      "FROM executions GROUP BY mode").fetchall():
+        por_modo[r[0] or 'paper'] = {'ops': r[1], 'net': round(r[2], 2)}
     c.close()
     return {
         'total_executions': total,
         'total_executed_net': round(total_net, 2),
         'successful_executions': wins,
+        'by_mode': por_modo,
     }
 
 
